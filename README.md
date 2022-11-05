@@ -2,7 +2,7 @@
 
 ## Store conf msg syntax
 
-``JSON
+```JSON
 {
   "store_conf": {
     "conf": {
@@ -13,4 +13,4 @@
     },
     "attributes": []
 }
-``
+```
