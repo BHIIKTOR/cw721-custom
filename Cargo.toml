@@ -7,9 +7,9 @@ authors = [
 edition = "2018"
 description = "CW721 with offchain randomization"
 license = "Apache-2.0"
-repository = "https://github.com/CosmWasm/cw-nfts"
-homepage = "https://cosmwasm.com"
-documentation = "https://docs.cosmwasm.com"
+repository = "https://github.com/BHIIKTOR/cw721-offchain-randomization"
+homepage = ""
+documentation = ""
 
 exclude = [
   # Those files are rust-optimizer artifacts. You might want to commit them for convenience but they should not be part of the source code publication.
