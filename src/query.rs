@@ -37,9 +37,12 @@ pub fn query_nft_info_batch(
     let mut data: Vec<TokenInfo<Extension>> = vec![];
 
     for token in tokens {
-        match contract.tokens.may_load(deps.storage, &token).unwrap() {
-            Some(item) => data.push(item),
-            None => {}
+        // match contract.tokens.may_load(deps.storage, &token).unwrap() {
+        //     Some(item) => data.push(item),
+        //     None => {}
+        // }
+        if let Some(item) = contract.tokens.may_load(deps.storage, &token).unwrap() {
+            data.push(item)
         }
     }
 
@@ -71,10 +74,11 @@ pub fn query_burned(
     let mut data: Vec<(String, bool)> = vec![];
 
     for token in tokens {
-        match BURNED.may_load(deps.storage, token.clone()).unwrap() {
-            Some(item) => data.push((token, item)),
-            None => {}
-        }
+        // match BURNED.may_load(deps.storage, token.clone()).unwrap() {
+        //     Some(item) => data.push((token, item)),
+        //     None => {}
+        // }
+        if let Some(item) = BURNED.may_load(deps.storage, token.clone()).unwrap() { data.push((token, item)) }
     }
 
     Ok(data)

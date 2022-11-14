@@ -21,7 +21,7 @@ pub struct BatchStoreMsg {
     pub batch: Vec<CW721MintMsg<Extension>>
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct BatchMintMsg {
     // pub batch: [CW721MintMsg<Extension>; 50],
     pub amount: Uint128
@@ -29,7 +29,7 @@ pub struct BatchMintMsg {
 
 use cw721::Expiration;
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct StoreConf {
     pub ipfs: String,
     pub desc: String,
@@ -37,13 +37,13 @@ pub struct StoreConf {
     pub attributes: Vec<String>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct StoreConfMsg {
     pub attributes: Vec<Vec<String>>,
     pub conf: Option<StoreConf>
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct InstantiateMsg {
     // Name of the NFT contract
     pub name: String,
@@ -70,7 +70,7 @@ pub struct InstantiateMsg {
     // turn this ON to allow holders of the nft to burn their tokens
     pub owners_can_burn: bool,
 
-    // turn this off to do not allow anyone to burn tokens
+    // turn this off to do not allow the contract owner to burn tokens
     pub minter_can_burn: bool,
 
     pub store_conf: Option<StoreConf>,
@@ -168,7 +168,7 @@ impl From<ExecuteMsg> for CW721ExecuteMsg<Extension> {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
     // Returns the current contract config
@@ -232,7 +232,7 @@ impl From<QueryMsg> for CW721QueryMsg {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, JsonSchema, Debug)]
 #[serde(rename_all = "snake_case")]
 pub struct MigrateMsg<T> {
     pub version: String,

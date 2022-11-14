@@ -3,7 +3,13 @@ mod tests {
     use crate::state::{Extension};
     use crate::contract::{execute, instantiate, query};
 
-    use crate::msg::{InstantiateMsg, ExecuteMsg, QueryMsg, BatchStoreMsg, BatchMintMsg};
+    use crate::msg::{
+        InstantiateMsg,
+        ExecuteMsg,
+        QueryMsg,
+        BatchStoreMsg,
+        BatchMintMsg,
+    };
 
     use cw721_base::{ MintMsg };
 
@@ -15,6 +21,7 @@ mod tests {
     };
 
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
+
     use cw721::{
         OwnerOfResponse
     };
@@ -26,6 +33,7 @@ mod tests {
 
     // const MINTER2: &str = "minter2";
     const FUNDWALLET: &str = "wallet";
+
     const DENOM: &str = "uluna";
     const SUPPLY: u128 = 5000u128;
     const COST: u128 = 4000000u128;
@@ -67,7 +75,7 @@ mod tests {
         }
 
         return BatchStoreMsg {
-            batch: batch
+            batch
         }
     }
 
@@ -416,6 +424,24 @@ mod tests {
 
         assert_eq!(res.attributes[0].value, "burn");
         assert_eq!(res.attributes[1].value, "owner_burn");
+    }
+
+    #[test]
+    fn query_nft_info_batch() {
+        QueryMsg::NftInfoBatch{
+            tokens: vec![
+                String::from("0"),
+                String::from("1"),
+            ]
+        };
+    }
+
+
+    #[test]
+    fn query_burned() {
+        QueryMsg::BurntList{
+            address: Addr::unchecked(FUNDWALLET)
+        };
     }
 }
 

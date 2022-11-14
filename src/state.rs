@@ -19,7 +19,7 @@ pub const BURNED: Map<String, bool> = Map::new("burned");
 // use cw_utils::{Expiration, Scheduled};
 use crate::msg::StoreConf;
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct Config {
     pub frozen: bool,
     pub token_supply: Uint128,
@@ -34,7 +34,7 @@ pub struct Config {
     pub store_conf: Option<StoreConf>
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug, Default)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, JsonSchema, Debug, Default)]
 pub struct Trait {
     pub display_type: Option<String>,
     pub trait_type: String,
@@ -42,7 +42,7 @@ pub struct Trait {
 }
 
 // see: https://docs.opensea.io/docs/metadata-standards
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug, Default)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, JsonSchema, Debug, Default)]
 pub struct Metadata {
     pub image: Option<String>,
     pub image_data: Option<String>,

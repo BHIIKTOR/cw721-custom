@@ -50,14 +50,14 @@ pub fn __update_burnt_amount(
   storage: &mut dyn Storage,
   sender: &Addr,
 ) -> Result<(), ContractError> {
-  match BURNT_AMOUNT.load(storage, &sender) {
+  match BURNT_AMOUNT.load(storage, sender) {
     Ok(mut amount) => {
         amount += Uint128::from(1u32);
-        BURNT_AMOUNT.save(storage, &sender, &amount)?;
+        BURNT_AMOUNT.save(storage, sender, &amount)?;
         Ok(())
     },
     Err(_) => {
-        BURNT_AMOUNT.save(storage, &sender, &Uint128::from(1u32))?;
+        BURNT_AMOUNT.save(storage, sender, &Uint128::from(1u32))?;
         Ok(())
     }
   }
@@ -66,16 +66,16 @@ pub fn __update_burnt_amount(
 pub fn __update_burnt_list(
   storage: &mut dyn Storage,
   sender: &Addr,
-  token: &String,
+  token: &str,
 ) -> Result<(), ContractError> {
-  match BURNT_LIST.load(storage, &sender) {
+  match BURNT_LIST.load(storage, sender) {
     Ok(mut list) => {
-        list.push(token.clone());
-        BURNT_LIST.save(storage, &sender, &list)?;
+        list.push(String::from(token));
+        BURNT_LIST.save(storage, sender, &list)?;
         Ok(())
     },
     Err(_) => {
-        BURNT_LIST.save(storage, &sender, &vec![token.clone()])?;
+        BURNT_LIST.save(storage, sender, &vec![String::from(token)])?;
         Ok(())
     }
   }
@@ -99,7 +99,7 @@ pub fn _can_store(
   deps: &DepsMut,
   info: &MessageInfo
 ) -> Result<(), ContractError> {
-  _can_update(&deps, &info)?;
+  _can_update(deps, info)?;
 
   let config = CONFIG.load(deps.storage)?;
   if config.token_total >= config.token_supply {
@@ -118,7 +118,7 @@ pub fn _can_pay(
 
   if let Some(coin) = info.funds.first() {
       if coin.denom != config.cost_denom {
-          return Err(ContractError::WrongToken {});
+        return Err(ContractError::WrongToken {});
       } else {
           let total = config.cost_amount * amount;
           println!("NotEnoughFunds: {} {} {}", coin.amount < total, coin.amount, total);
@@ -132,11 +132,11 @@ pub fn _can_pay(
 
               Ok(coin_found)
           } else {
-              return Err(ContractError::IncorrectFunds {});
+            return Err(ContractError::IncorrectFunds {});
           }
       }
   } else {
-      return Err(ContractError::NoFundsSent {});
+    return Err(ContractError::NoFundsSent {});
   }
 }
 
@@ -159,7 +159,7 @@ pub fn _can_mint(
     }
   }
 
-  let current_count = Uint128::from(count.clone());
+  let current_count = Uint128::from(*count);
 
   if current_count == token_supply {
     return Err(ContractError::MaxTokenSupply {});
@@ -182,7 +182,7 @@ pub fn __update_total(
   amount: Uint128
 ) -> Result<(), ContractError> {
   let mut config = CONFIG.load(storage)?;
-  config.token_total = config.token_total + amount;
+  config.token_total += amount;
   CONFIG.save(storage, &config)?;
   Ok(())
 }
@@ -203,7 +203,7 @@ pub fn _try_store(
       extension: nft_data.extension.clone(),
   };
 
-  contract.tokens.save(storage, &token_id.clone(), &token)?;
+  contract.tokens.save(storage, &token_id, &token)?;
 
   Ok(())
 }

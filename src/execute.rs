@@ -44,7 +44,7 @@ pub fn execute_burn(
     let cw721_contract = CW721Contract::default();
     let config = CONFIG.load(deps.storage)?;
 
-    if config.owners_can_burn == true {
+    if config.owners_can_burn {
         let token = cw721_contract.tokens.load(deps.storage, &token_id)?;
 
         if token.owner != info.sender {
@@ -63,7 +63,7 @@ pub fn execute_burn(
             .add_attribute("token_id", token_id))
     }
 
-    if config.minter_can_burn == true {
+    if config.minter_can_burn {
         // validate sender permissions
         _can_update(&deps, &info)?;
 
@@ -97,11 +97,11 @@ pub fn execute_burn_batch(
         return Err(ContractError::RequestTooLarge{ size: tokens.len() })
     }
 
-    if tokens.len() == 0 {
+    if tokens.is_empty() {
         return Err(ContractError::RequestTooSmall{ size: tokens.len() })
     }
 
-    if config.owners_can_burn == true {
+    if config.owners_can_burn {
         let mut burnt_tokens = vec![];
 
         for token_id in tokens {
@@ -123,11 +123,11 @@ pub fn execute_burn_batch(
         return Ok(Response::new()
             .add_attribute("action", "burn_batch")
             .add_attribute("type", "owner_burn")
-            .add_attribute("tokens", String::from(format!("[{}]", burnt_tokens.join(","))))
+            .add_attribute("tokens", format!("[{}]", burnt_tokens.join(",")))
         )
     }
 
-    if config.minter_can_burn == true {
+    if config.minter_can_burn {
         // validate sender permissions
         _can_update(&deps, &info)?;
 
@@ -144,7 +144,7 @@ pub fn execute_burn_batch(
         return Ok(Response::new()
             .add_attribute("action", "burn")
             .add_attribute("type", "minter_burn")
-            .add_attribute("tokens", String::from(format!("[{}]", burnt_tokens.join(","))))
+            .add_attribute("tokens", format!("[{}]", burnt_tokens.join(",")))
         )
     }
 
@@ -196,9 +196,9 @@ pub fn execute_mint(
         .add_attribute("token_id", current_count.to_string())
         .add_message(
             CosmosMsg::Bank(BankMsg::Send {
-                to_address: config.funds_wallet.to_string(),
+                to_address: config.funds_wallet,
                 amount: vec![coin_found],
-            }.clone())
+            })
         )
     )
 }
@@ -270,12 +270,12 @@ pub fn execute_mint_batch(
         .add_attribute("requested", msg.amount.to_string())
         .add_attribute("minted", total_minted.to_string())
         .add_attribute("cost", coin_found.amount.to_string())
-        .add_attribute("list", String::from(format!("[{}]", ids.join(","))))
+        .add_attribute("list", format!("[{}]", ids.join(",")))
         .add_message(
             CosmosMsg::Bank(BankMsg::Send {
-                to_address: config.funds_wallet.to_string(),
+                to_address: config.funds_wallet,
                 amount: vec![coin_found],
-            }.clone())
+            })
         )
     )
 }
@@ -369,7 +369,7 @@ pub fn execute_store_conf(
             token_uri: None,
             extension: Some(Metadata {
                 name: Some(name.clone()),
-                description: Some(format!("{}", conf.desc)),
+                description: Some(conf.desc.to_string()),
                 image: Some(format!("{}/{}.png", conf.ipfs, total)),
                 attributes: Some(attr),
                 animation_url: None,

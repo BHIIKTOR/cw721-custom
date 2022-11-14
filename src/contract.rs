@@ -7,7 +7,11 @@ use crate::state::{Config, CW721Contract, CONFIG};
 
 use cw2::set_contract_version;
 
-pub use cw721_base::{MintMsg, MinterResponse};
+pub use cw721_base::{
+    MintMsg,
+    MinterResponse,
+    InstantiateMsg as CW721InitMsg
+};
 
 use crate::execute::{
     execute_burn,
@@ -44,16 +48,16 @@ pub fn instantiate(
 ) -> StdResult<Response> {
     let config = Config {
         frozen: false,
-        token_supply: msg.token_supply.clone(),
+        token_supply: msg.token_supply,
         token_total: Uint128::from(0u128),
-        cost_denom: msg.cost_denom.clone(),
-        cost_amount: msg.cost_amount.clone(),
+        cost_denom: msg.cost_denom,
+        cost_amount: msg.cost_amount,
         start_mint: msg.start_mint,
-        max_mint_batch: msg.max_mint_batch.clone(),
-        owners_can_burn: msg.owners_can_burn.clone(),
-        minter_can_burn: msg.minter_can_burn.clone(),
-        funds_wallet: msg.funds_wallet.clone(),
-        store_conf: Some(msg.store_conf.clone()).unwrap(),
+        max_mint_batch: msg.max_mint_batch,
+        owners_can_burn: msg.owners_can_burn,
+        minter_can_burn: msg.minter_can_burn,
+        funds_wallet: msg.funds_wallet,
+        store_conf: Some(msg.store_conf).unwrap(),
     };
 
     // We use the set_contract_version function that we loaded above using cw2
@@ -62,7 +66,17 @@ pub fn instantiate(
     // We save the state to the database
     CONFIG.save(deps.storage, &config)?;
 
-    CW721Contract::default().instantiate(deps, env, info, msg.into())
+    CW721Contract::default()
+        .instantiate(
+            deps,
+            env,
+            info,
+            CW721InitMsg {
+                name: msg.name,
+                symbol: msg.symbol,
+                minter: msg.minter
+            }
+    )
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -110,7 +124,9 @@ pub fn migrate(
     _env: Env,
     msg: MigrateMsg<Config>,
 ) -> Result<Response, ContractError> {
-    match msg {
-        MigrateMsg { version, config } => try_migrate(deps, version, config),
-    }
+    let MigrateMsg { version, config } = msg;
+    try_migrate(deps, version, config)
+    // match msg {
+    //     MigrateMsg { version, config } => try_migrate(deps, version, config),
+    // }
 }
