@@ -118,7 +118,7 @@ pub fn _can_pay(
 
   if let Some(coin) = info.funds.first() {
       if coin.denom != config.cost_denom {
-        return Err(ContractError::WrongToken {});
+        Err(ContractError::WrongToken {})
       } else {
           let total = config.cost_amount * amount;
           println!("NotEnoughFunds: {} {} {}", coin.amount < total, coin.amount, total);
@@ -132,11 +132,11 @@ pub fn _can_pay(
 
               Ok(coin_found)
           } else {
-            return Err(ContractError::IncorrectFunds {});
+            Err(ContractError::IncorrectFunds {})
           }
       }
   } else {
-    return Err(ContractError::NoFundsSent {});
+    Err(ContractError::NoFundsSent {})
   }
 }
 
