@@ -6,9 +6,9 @@ It lacks things, like minting a random token instead of doing it sequentially, b
 The contract allows for three different types of storing methods:
 * store - 1:1 data storage (based on opensea medata)
 * store batch - 1:1 data storage (based on opensea medata) but in batch
-* store conf - and optimized method that allows to send the repetitive info once and the attributes for the metadata just once
+* store conf - and optimized method that allows to send the repetitive info once and the attributes for the metadata in mass
 
-I also allows to mint one token or mint many.
+It also allows to mint one token or mint many.
 
 It also allows the new owner of the token to burn their tokens based on configuration and disallow the original minter to rebuy or burn the tokens
 
