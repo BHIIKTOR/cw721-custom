@@ -1,4 +1,7 @@
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{
+  SystemTime,
+  UNIX_EPOCH
+};
 
 use cosmwasm_std::{
   DepsMut,
@@ -31,7 +34,7 @@ pub fn _now() -> Timestamp {
   Timestamp::from_seconds(SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs())
 }
 
-pub fn _can_update(
+pub fn can_update(
   deps: &DepsMut,
   info: &MessageInfo
 ) -> Result<(), ContractError> {
@@ -46,7 +49,7 @@ pub fn _can_update(
   Ok(())
 }
 
-pub fn __update_burnt_amount(
+pub fn update_burnt_amount(
   storage: &mut dyn Storage,
   sender: &Addr,
 ) -> Result<(), ContractError> {
@@ -63,7 +66,7 @@ pub fn __update_burnt_amount(
   }
 }
 
-pub fn __update_burnt_list(
+pub fn update_burnt_list(
   storage: &mut dyn Storage,
   sender: &Addr,
   token: &str,
@@ -81,25 +84,37 @@ pub fn __update_burnt_list(
   }
 }
 
-pub fn __burn_token(
+pub fn burn_token(
   contract: &CW721Contract,
   storage: &mut dyn Storage,
   token_id: String
 ) -> Result<(), ContractError> {
   contract.tokens.remove(storage, &token_id)?;
-
   contract.decrement_tokens(storage)?;
-
   BURNED.save(storage, token_id, &true)?;
-
   Ok(())
 }
 
-pub fn _can_store(
+pub fn burn_and_update(
+  contract: &CW721Contract,
+  storage: &mut dyn Storage,
+  token_id: String,
+  sender: Addr,
+  update_list: bool
+) -> Result<(), ContractError> {
+  burn_token(contract, storage, token_id.clone())?;
+  update_burnt_amount(storage, &sender)?;
+  if update_list {
+    update_burnt_list(storage, &sender, &token_id)?;
+  }
+  Ok(())
+}
+
+pub fn can_store(
   deps: &DepsMut,
   info: &MessageInfo
 ) -> Result<(), ContractError> {
-  _can_update(deps, info)?;
+  can_update(deps, info)?;
 
   let config = CONFIG.load(deps.storage)?;
   if config.token_total >= config.token_supply {
@@ -109,7 +124,7 @@ pub fn _can_store(
   Ok(())
 }
 
-pub fn _can_pay(
+pub fn can_pay(
   config: &Config,
   info: &MessageInfo,
   amount: Uint128
@@ -140,7 +155,7 @@ pub fn _can_pay(
   }
 }
 
-pub fn _can_mint(
+pub fn can_mint(
   count: &u64,
   time: &Timestamp,
   start_mint: &Option<Timestamp>,
@@ -177,7 +192,7 @@ pub fn _can_mint(
   Ok(current_count)
 }
 
-pub fn __update_total(
+pub fn update_total(
   storage: &mut dyn Storage,
   amount: Uint128
 ) -> Result<(), ContractError> {
@@ -187,7 +202,7 @@ pub fn __update_total(
   Ok(())
 }
 
-pub fn _try_store(
+pub fn try_store(
   storage: &mut dyn Storage,
   nft_data: &MintMsg<Extension>,
   minter: &Addr,
@@ -208,7 +223,7 @@ pub fn _try_store(
   Ok(())
 }
 
-pub fn _try_mint(
+pub fn try_mint(
   storage: &mut dyn Storage,
   sender: &Addr,
   minter: &Addr,

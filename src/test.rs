@@ -20,7 +20,11 @@ mod tests {
         Addr
     };
 
-    use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
+    use cosmwasm_std::testing::{
+        mock_dependencies,
+        mock_env,
+        mock_info
+    };
 
     use cw721::{
         OwnerOfResponse

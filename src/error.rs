@@ -68,6 +68,18 @@ pub enum ContractError {
 
     #[error("There is nothing to mint")]
     CantMintNothing {},
+
+    #[error("Failed to burn token")]
+    BurnFailed {},
+
+    #[error("Failed to update burn token amount")]
+    FailedBurnedUpdateAmount {},
+
+    #[error("Failed to update burn token list")]
+    FailedBurnedUpdateList {},
+
+    #[error("Error {error}")]
+    DelegateError { error: StdError },
 }
 
 impl From<CW721ContractError> for ContractError {

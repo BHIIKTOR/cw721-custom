@@ -20,22 +20,22 @@ use crate::state::{
 };
 
 use crate::helpers::{
-    _can_mint,
-    _can_pay,
-    _can_store,
-    _can_update,
-    _try_mint,
-    _try_store,
-    __update_total,
-    __burn_token,
-    __update_burnt_amount,
-    __update_burnt_list
+    can_mint,
+    can_pay,
+    can_store,
+    can_update,
+    try_mint,
+    try_store,
+    burn_and_update,
+    update_total
 };
 
 use crate::error::ContractError;
 
 use crate::msg::{ BatchStoreMsg, BatchMintMsg, StoreConfMsg };
 
+
+// TODO: AT START MINTER AND OWNER IS THE SAME SO IT WILL ENTER OWNER BURN
 pub fn execute_burn(
     deps: DepsMut,
     info: MessageInfo,
@@ -51,11 +51,13 @@ pub fn execute_burn(
             return Err(ContractError::Unauthorized {})
         }
 
-        __burn_token(&cw721_contract, deps.storage, token_id.clone())?;
-
-        __update_burnt_amount(deps.storage, &info.sender)?;
-
-        __update_burnt_list(deps.storage, &info.sender, &token_id)?;
+        burn_and_update(
+            &cw721_contract,
+            deps.storage,
+            token_id.clone(),
+            info.sender,
+            true
+        )?;
 
         return Ok(Response::new()
             .add_attribute("action", "burn")
@@ -65,11 +67,15 @@ pub fn execute_burn(
 
     if config.minter_can_burn {
         // validate sender permissions
-        _can_update(&deps, &info)?;
+        can_update(&deps, &info)?;
 
-        __burn_token(&cw721_contract, deps.storage, token_id.clone())?;
-
-        __update_burnt_list(deps.storage, &info.sender, &token_id)?;
+        burn_and_update(
+            &cw721_contract,
+            deps.storage,
+            token_id.clone(),
+            info.sender,
+            true
+        )?;
 
         return Ok(Response::new()
             .add_attribute("action", "burn")
@@ -85,6 +91,7 @@ pub fn execute_burn(
     )
 }
 
+// TODO: AT START MINTER AND OWNER IS THE SAME SO IT WILL ENTER OWNER BURN
 pub fn execute_burn_batch(
     deps: DepsMut,
     info: MessageInfo,
@@ -103,6 +110,8 @@ pub fn execute_burn_batch(
 
     if config.owners_can_burn {
         let mut burnt_tokens = vec![];
+        let mut not_burnt_tokens = vec![];
+        let mut errors : Vec<String> = vec![];
 
         for token_id in tokens {
             let token = cw721_contract.tokens.load(deps.storage, &token_id)?;
@@ -111,41 +120,75 @@ pub fn execute_burn_batch(
                 return Err(ContractError::Unauthorized {})
             }
 
-            __burn_token(&cw721_contract, deps.storage, token_id.clone())?;
+            let res = burn_and_update(
+                &cw721_contract,
+                deps.storage,
+                token_id.clone(),
+                info.sender.clone(),
+                true
+            );
 
-            __update_burnt_amount(deps.storage, &info.sender)?;
-
-            __update_burnt_list(deps.storage, &info.sender, &token_id)?;
-
-            burnt_tokens.push(token_id);
+            if res.is_err() {
+                not_burnt_tokens.push(token_id);
+                errors.push(res.unwrap_err().to_string())
+            } else {
+                burnt_tokens.push(token_id);
+            }
         }
 
-        return Ok(Response::new()
+        let mut res = Response::new();
+
+        res = res
             .add_attribute("action", "burn_batch")
             .add_attribute("type", "owner_burn")
-            .add_attribute("tokens", format!("[{}]", burnt_tokens.join(",")))
-        )
+            .add_attribute("tokens", format!("[{}]", burnt_tokens.join(",")));
+
+        if !not_burnt_tokens.is_empty() {
+            res = res.add_attribute("not_burn", format!("[{}]", not_burnt_tokens.join(",")));
+        }
+
+        if !errors.is_empty() {
+            res = res.add_attribute("errors", format!("[{}]", errors.join(",")));
+        }
+
+        return Ok(res)
     }
 
     if config.minter_can_burn {
         // validate sender permissions
-        _can_update(&deps, &info)?;
+        can_update(&deps, &info)?;
 
         let mut burnt_tokens = vec![];
+        let mut not_burnt_tokens = vec![];
 
         for token_id in tokens {
-            __burn_token(&cw721_contract, deps.storage, token_id.clone())?;
+            let res = burn_and_update(
+                &cw721_contract,
+                deps.storage,
+                token_id.clone(),
+                info.sender.clone(),
+                false
+            );
 
-            __update_burnt_list(deps.storage, &info.sender, &token_id)?;
-
-            burnt_tokens.push(token_id);
+            if res.is_err() {
+                not_burnt_tokens.push(token_id)
+            } else {
+                burnt_tokens.push(token_id);
+            }
         }
 
-        return Ok(Response::new()
-            .add_attribute("action", "burn")
-            .add_attribute("type", "minter_burn")
-            .add_attribute("tokens", format!("[{}]", burnt_tokens.join(",")))
-        )
+        let mut res = Response::new();
+
+        res = res
+            .add_attribute("action", "burn_batch")
+            .add_attribute("type", "owner_burn")
+            .add_attribute("tokens", format!("[{}]", burnt_tokens.join(",")));
+
+        if !not_burnt_tokens.is_empty() {
+            res = res.add_attribute("not_burn", format!("[{}]", not_burnt_tokens.join(",")));
+        }
+
+        return Ok(res)
     }
 
     Ok(Response::new()
@@ -167,7 +210,7 @@ pub fn execute_mint(
     let current_count = cw721_contract.token_count(deps.storage)?;
 
     // check if we can mint
-    let current_token_id = _can_mint(
+    let current_token_id = can_mint(
         &current_count,
         &env.block.time,
         &config.start_mint,
@@ -178,9 +221,9 @@ pub fn execute_mint(
     )?;
 
     // validate funds according to set price
-    let coin_found = _can_pay(&config, &info, Uint128::from(1u32))?;
+    let coin_found = can_pay(&config, &info, Uint128::from(1u32))?;
 
-    _try_mint(
+    try_mint(
         deps.storage,
         &info.sender,
         &minter,
@@ -227,7 +270,7 @@ pub fn execute_mint_batch(
     }
 
     // check if we can mint
-    let mut current_token_id = _can_mint(
+    let mut current_token_id = can_mint(
         &minted_total,
         &env.block.time,
         &config.start_mint,
@@ -238,14 +281,14 @@ pub fn execute_mint_batch(
     )?;
 
     // validate funds according to set price and total to mint
-    let mut coin_found = _can_pay(&config, &info, mint_amount)?;
+    let mut coin_found = can_pay(&config, &info, mint_amount)?;
 
     let mut total_minted = 0u32;
 
     let mut ids: Vec<String> = vec![];
 
     while Uint128::from(total_minted) < mint_amount {
-        let res = _try_mint(
+        let res = try_mint(
             deps.storage,
             &info.sender,
             &minter,
@@ -286,15 +329,15 @@ pub fn execute_store(
     nft_data: MintMsg<Extension>,
 ) -> Result<Response, ContractError> {
     // validate sender permissions
-    _can_store(&deps, &info)?;
+    can_store(&deps, &info)?;
 
     let cw721_contract = CW721Contract::default();
     let minter = cw721_contract.minter.load(deps.storage)?;
 
-    _try_store(deps.storage, &nft_data, &minter, &cw721_contract)?;
+    try_store(deps.storage, &nft_data, &minter, &cw721_contract)?;
 
     let total = CONFIG.load(deps.storage)?.token_total + Uint128::from(1u8);
-    __update_total(deps.storage, total)?;
+    update_total(deps.storage, total)?;
 
     Ok(Response::new()
         .add_attribute("action", "store")
@@ -308,18 +351,18 @@ pub fn execute_store_batch(
     data: BatchStoreMsg,
 ) -> Result<Response, ContractError> {
     // validate sender permissions
-    _can_store(&deps, &info)?;
+    can_store(&deps, &info)?;
 
     let cw721_contract = CW721Contract::default();
     let minter = cw721_contract.minter.load(deps.storage)?;
 
     let mut total = CONFIG.load(deps.storage)?.token_total;
     for nft_data in data.batch {
-        _try_store(deps.storage, &nft_data, &minter, &cw721_contract)?;
+        try_store(deps.storage, &nft_data, &minter, &cw721_contract)?;
         total += Uint128::from(1u8)
     }
 
-    __update_total(deps.storage, total)?;
+    update_total(deps.storage, total)?;
 
     Ok(Response::new()
         .add_attribute("action", "store_batch")
@@ -333,7 +376,7 @@ pub fn execute_store_conf(
     msg: StoreConfMsg,
 )-> Result<Response, ContractError> {
     // validate sender permissions
-    _can_store(&deps, &info)?;
+    can_store(&deps, &info)?;
 
     let cw721_contract = CW721Contract::default();
     let minter = cw721_contract.minter.load(deps.storage)?;
@@ -385,7 +428,7 @@ pub fn execute_store_conf(
         total += Uint128::from(1u8)
     }
 
-    __update_total(deps.storage, total)?;
+    update_total(deps.storage, total)?;
 
     Ok(Response::new()
         .add_attribute("action", "store_conf")
