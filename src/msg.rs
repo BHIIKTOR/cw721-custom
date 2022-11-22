@@ -54,7 +54,11 @@ pub struct InstantiateMsg {
     // minter
     pub minter: String, // who can mint
 
+    // if some start mint is used to start at a date
     pub start_mint: Option<Timestamp>,
+
+    // if some end mint is the limit of minting phase
+    pub end_mint: Option<Timestamp>,
 
     pub cost_denom: String, // name of the token
     pub cost_amount: Uint128, // amount
@@ -65,7 +69,8 @@ pub struct InstantiateMsg {
     // wallet that recieves the funds
     pub funds_wallet: String,
 
-    pub max_mint_batch: Uint128,
+    // defaults to 10
+    pub max_mint_batch: Option<Uint128>,
 
     // turn this ON to allow holders of the nft to burn their tokens
     pub owners_can_burn: bool,

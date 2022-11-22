@@ -23,6 +23,15 @@ pub enum ContractError {
     #[error("Cant mint yet")]
     CantMintYet {},
 
+    #[error("Mint has ended")]
+    MintEnded {},
+
+    #[error("Mint amount is zero")]
+    MintZero {},
+
+    #[error("Mint amount is larger than allowed")]
+    MintAmountLargerThanAllowed {},
+
     #[error("Token not found")]
     TokenNotFound {},
 

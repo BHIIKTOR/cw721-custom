@@ -1,105 +1,63 @@
 #[cfg(test)]
-mod tests {
-    use crate::state::{Extension};
-    use crate::contract::{execute, instantiate, query};
-
-    use crate::msg::{
-        InstantiateMsg,
-        ExecuteMsg,
-        QueryMsg,
-        BatchStoreMsg,
-        BatchMintMsg,
-    };
-
-    use cw721_base::{ MintMsg };
-
+mod general_tests {
     use cosmwasm_std::{
         from_binary,
         Uint128,
         Coin,
-        Addr
+        Addr,
+        Timestamp,
     };
 
     use cosmwasm_std::testing::{
         mock_dependencies,
         mock_env,
-        mock_info
+        mock_info,
+    };
+
+    use cw721_base::MintMsg;
+
+    use crate::contract::{ execute, instantiate, query };
+
+    use crate::msg::{
+        ExecuteMsg,
+        QueryMsg,
+        BatchMintMsg,
     };
 
     use cw721::{
         OwnerOfResponse
     };
 
+    use crate::tests::helpers::tests_helpers::{
+        get_init_msg,
+        get_store_batch_msg,
+        get_mint_msg,
+    };
+
     use crate::helpers::_now;
 
-    const CREATOR: &str = "creator";
+    const ADMIN: &str = "admin";
     const MINTER: &str = "minter";
 
-    // const MINTER2: &str = "minter2";
-    const FUNDWALLET: &str = "wallet";
-
     const DENOM: &str = "uluna";
-    const SUPPLY: u128 = 5000u128;
-    const COST: u128 = 4000000u128;
-
-    fn get_mint_msg (id: String) -> MintMsg<Extension> {
-        return MintMsg {
-            token_id: String::from(id),
-            owner: CREATOR.to_string(),
-            token_uri: None,
-            extension: None,
-        };
-    }
-
-    fn get_init_msg () -> InstantiateMsg {
-        InstantiateMsg {
-            name: "nftt".to_string(),
-            symbol: "NFTT".to_string(),
-            minter: CREATOR.to_string(),
-            funds_wallet: FUNDWALLET.to_string(),
-            token_supply: Uint128::from(SUPPLY),
-            cost_denom: DENOM.to_string(),
-            cost_amount: Uint128::from(COST),
-            max_mint_batch: Uint128::from(10u128),
-            owners_can_burn: false,
-            minter_can_burn: true,
-            start_mint: Some(_now()),
-            store_conf: None
-        }
-    }
-
-    fn get_store_batch_msg () -> BatchStoreMsg {
-        let mut batch: Vec<MintMsg<Extension>> = vec![];
-        let num: usize = 20;
-
-        for elem in 0..num {
-            // let mut msg = msg_1.clone();
-            // msg.token_id = String::from(format!("{}", elem));
-            batch.push(get_mint_msg(String::from(format!("{}", elem))));
-        }
-
-        return BatchStoreMsg {
-            batch
-        }
-    }
 
     #[test]
     fn store() {
         let mut deps = mock_dependencies();
-        let info = mock_info(CREATOR, &[]);
+        let info = mock_info(ADMIN, &[]);
 
-        instantiate(deps.as_mut(), mock_env(), info.clone(), get_init_msg()).unwrap();
+        instantiate(deps.as_mut(), mock_env(), info.clone(), get_init_msg(0, 900)).unwrap();
 
         let msg_1 = MintMsg {
             token_id: String::from("0"),
-            owner: CREATOR.to_string(),
+            owner: ADMIN.to_string(),
             token_uri: None,
             extension: None,
         };
 
         let exec_store = ExecuteMsg::Store(msg_1);
 
-        let res = execute(deps.as_mut(), mock_env(), info.clone(), exec_store).unwrap();
+        let res = execute(deps.as_mut(), mock_env(), info, exec_store).unwrap();
 
         assert_eq!(res.attributes[0].value, "store");
 
@@ -110,7 +68,7 @@ mod tests {
 
         let res: OwnerOfResponse = from_binary(&query(deps.as_ref(), mock_env(), query_msg).unwrap()).unwrap();
 
-        assert_eq!(res.owner, CREATOR);
+        assert_eq!(res.owner, ADMIN);
 
         let query_msg: QueryMsg = QueryMsg::OwnerOf {
             token_id: String::from("0"),
@@ -119,21 +77,21 @@ mod tests {
 
         let res: OwnerOfResponse = from_binary(&query(deps.as_ref(), mock_env(), query_msg).unwrap()).unwrap();
 
-        assert_eq!(res.owner, CREATOR);
+        assert_eq!(res.owner, ADMIN);
     }
 
     #[test]
     fn store_batch() {
         let mut deps = mock_dependencies();
-        let info = mock_info(CREATOR, &[]);
+        let info = mock_info(ADMIN, &[]);
 
-        instantiate(deps.as_mut(), mock_env(), info.clone(), get_init_msg()).unwrap();
+        instantiate(deps.as_mut(), mock_env(), info.clone(), get_init_msg(0, 900)).unwrap();
 
         // store batch
         let res = execute(
             deps.as_mut(),
             mock_env(),
-            info.clone(),
+            info,
             ExecuteMsg::StoreBatch(get_store_batch_msg())
         ).unwrap();
 
@@ -148,7 +106,7 @@ mod tests {
 
         let res: OwnerOfResponse = from_binary(&query(deps.as_ref(), mock_env(), query_msg).unwrap()).unwrap();
 
-        assert_eq!(res.owner, CREATOR);
+        assert_eq!(res.owner, ADMIN);
 
         let query_msg: QueryMsg = QueryMsg::OwnerOf {
             token_id: String::from("1"),
@@ -157,21 +115,21 @@ mod tests {
 
         let res: OwnerOfResponse = from_binary(&query(deps.as_ref(), mock_env(), query_msg).unwrap()).unwrap();
 
-        assert_eq!(res.owner, CREATOR);
+        assert_eq!(res.owner, ADMIN);
     }
 
     #[test]
     fn mint(){
         let mut deps = mock_dependencies();
-        let info = mock_info(CREATOR, &[]);
+        let info = mock_info(ADMIN, &[]);
 
-        instantiate(deps.as_mut(), mock_env(), info.clone(), get_init_msg()).unwrap();
+        instantiate(deps.as_mut(), mock_env(), info, get_init_msg(0, 900)).unwrap();
 
         // store batch
         execute(
             deps.as_mut(),
             mock_env(),
-            mock_info(CREATOR, &[]),
+            mock_info(ADMIN, &[]),
             ExecuteMsg::StoreBatch(get_store_batch_msg())
         ).unwrap();
 
@@ -200,15 +158,15 @@ mod tests {
     #[test]
     fn mint_batch(){
         let mut deps = mock_dependencies();
-        let info = mock_info(CREATOR, &[]);
+        let info = mock_info(ADMIN, &[]);
 
-        instantiate(deps.as_mut(), mock_env(), info.clone(), get_init_msg()).unwrap();
+        instantiate(deps.as_mut(), mock_env(), info, get_init_msg(0, 900)).unwrap();
 
         // store batch
         execute(
             deps.as_mut(),
             mock_env(),
-            mock_info(CREATOR, &[]),
+            mock_info(ADMIN, &[]),
             ExecuteMsg::StoreBatch(get_store_batch_msg())
         ).unwrap();
 
@@ -231,9 +189,48 @@ mod tests {
         };
 
         let res: OwnerOfResponse = from_binary(&query(deps.as_ref(), mock_env(), query_msg).unwrap()).unwrap();
+        assert_eq!(res.owner, MINTER);
+    }
 
-        println!("prints: {} {}", res.owner, MINTER);
+    #[test]
+    #[should_panic(expected = "MintAmountLargerThanAllowed")]
+    fn mint_batch_amount_too_large(){
+        let mut deps = mock_dependencies();
+        let info = mock_info(ADMIN, &[]);
 
+        let mut msg = get_init_msg(0, 900);
+        // make max_mint batch 5
+        msg.max_mint_batch = Some(Uint128::from(5u128));
+
+        instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+
+        // store batch
+        execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info(ADMIN, &[]),
+            ExecuteMsg::StoreBatch(get_store_batch_msg())
+        ).unwrap();
+
+        // TRY TO MINT 10 TOKENS
+        let exec_mint = ExecuteMsg::MintBatch(BatchMintMsg {
+            amount: Uint128::from(10u32)
+        });
+
+        let mut env = mock_env();
+        env.block.time = _now();
+
+        // SEND EXACT AMOUNT FOR IT TO ACCEPT THE TRANSACTION
+        execute(deps.as_mut(), env, mock_info(MINTER, &[
+            Coin::new(40000000u128, DENOM.to_string())
+        ]), exec_mint).unwrap();
+
+        let query_msg: QueryMsg = QueryMsg::OwnerOf {
+            token_id: String::from("1"),
+            include_expired: Some(true)
+        };
+
+        let res: OwnerOfResponse = from_binary(&query(deps.as_ref(), mock_env(), query_msg).unwrap()).unwrap();
         assert_eq!(res.owner, MINTER);
     }
 
@@ -241,14 +238,14 @@ mod tests {
     #[should_panic(expected = "NoFundsSent")]
     fn mint_no_funds() {
         let mut deps = mock_dependencies();
-        let info = mock_info(CREATOR, &[]);
+        let info = mock_info(ADMIN, &[]);
 
-        instantiate(deps.as_mut(), mock_env(), info.clone(), get_init_msg()).unwrap();
+        instantiate(deps.as_mut(), mock_env(), info.clone(), get_init_msg(0, 900)).unwrap();
 
         execute(
             deps.as_mut(),
             mock_env(),
-            info.clone(),
+            info,
             ExecuteMsg::Store(get_mint_msg(String::from("0")))
         ).unwrap();
 
@@ -266,14 +263,14 @@ mod tests {
     #[should_panic(expected = "NotEnoughFunds")]
     fn mint_wrong_funds() {
         let mut deps = mock_dependencies();
-        let info = mock_info(CREATOR, &[]);
+        let info = mock_info(ADMIN, &[]);
 
-        instantiate(deps.as_mut(), mock_env(), info.clone(), get_init_msg()).unwrap();
+        instantiate(deps.as_mut(), mock_env(), info.clone(), get_init_msg(0, 900)).unwrap();
 
         execute(
             deps.as_mut(),
             mock_env(),
-            info.clone(),
+            info,
             ExecuteMsg::Store(get_mint_msg(String::from("0")))
         ).unwrap();
 
@@ -289,16 +286,16 @@ mod tests {
 
     #[test]
     #[should_panic(expected = "CantMintYet")]
-    fn mint_wrong_time() {
+    fn mint_scheduled_start_time() {
         let mut deps = mock_dependencies();
-        let info = mock_info(CREATOR, &[]);
+        let info = mock_info(ADMIN, &[]);
 
-        instantiate(deps.as_mut(), mock_env(), info.clone(), get_init_msg()).unwrap();
+        instantiate(deps.as_mut(), mock_env(), info.clone(), get_init_msg(300, 900)).unwrap();
 
         execute(
             deps.as_mut(),
             mock_env(),
-            info.clone(),
+            info,
             ExecuteMsg::Store(get_mint_msg(String::from("0")))
         ).unwrap();
 
@@ -308,7 +305,83 @@ mod tests {
 
         let mut env = mock_env();
         // NOTE: this makes it fail ;)
-        env.block.time = _now().minus_seconds(300);
+        env.block.time = Timestamp::from_seconds(0);
+
+        execute(deps.as_mut(), env, info, ExecuteMsg::Mint()).unwrap();
+    }
+
+    #[test]
+    #[should_panic(expected = "MintEnded")]
+    fn mint_scheduled_end_time() {
+        let mut deps = mock_dependencies();
+        let info = mock_info(ADMIN, &[]);
+
+        instantiate(deps.as_mut(), mock_env(), info.clone(), get_init_msg(0, 200)).unwrap();
+
+        execute(
+            deps.as_mut(),
+            mock_env(),
+            info,
+            ExecuteMsg::Store(get_mint_msg(String::from("0")))
+        ).unwrap();
+
+        let info = mock_info(MINTER, &[
+            Coin::new(4000000u128, DENOM.to_string())
+        ]);
+
+        let mut env = mock_env();
+        // NOTE: this makes it fail ;)
+        env.block.time = Timestamp::from_seconds(0).plus_seconds(300);
+
+        execute(deps.as_mut(), env, info, ExecuteMsg::Mint()).unwrap();
+    }
+
+    #[test]
+    fn mint_no_end_time() {
+        let mut deps = mock_dependencies();
+        let info = mock_info(ADMIN, &[]);
+        let mut msg = get_init_msg(0, 0);
+        msg.end_mint = None;
+        instantiate(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
+
+        execute(
+            deps.as_mut(),
+            mock_env(),
+            info,
+            ExecuteMsg::Store(get_mint_msg(String::from("0")))
+        ).unwrap();
+
+        let info = mock_info(MINTER, &[
+            Coin::new(4000000u128, DENOM.to_string())
+        ]);
+
+        let mut env = mock_env();
+        env.block.time = Timestamp::from_seconds(0).plus_seconds(3000);
+
+        execute(deps.as_mut(), env, info, ExecuteMsg::Mint()).unwrap();
+    }
+
+    #[test]
+    fn mint_no_start_time() {
+        let mut deps = mock_dependencies();
+        let info = mock_info(ADMIN, &[]);
+        let mut msg = get_init_msg(0, 300);
+        msg.start_mint = None;
+        instantiate(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
+
+        execute(
+            deps.as_mut(),
+            mock_env(),
+            info,
+            ExecuteMsg::Store(get_mint_msg(String::from("0")))
+        ).unwrap();
+
+        let info = mock_info(MINTER, &[
+            Coin::new(4000000u128, DENOM.to_string())
+        ]);
+
+        let mut env = mock_env();
+        env.block.time = Timestamp::from_seconds(0);
 
         execute(deps.as_mut(), env, info, ExecuteMsg::Mint()).unwrap();
     }
@@ -316,9 +389,9 @@ mod tests {
     #[test]
     fn burn() {
         let mut deps = mock_dependencies();
-        let info = mock_info(CREATOR, &[]);
+        let info = mock_info(ADMIN, &[]);
 
-        instantiate(deps.as_mut(), mock_env(), info.clone(), get_init_msg()).unwrap();
+        instantiate(deps.as_mut(), mock_env(), info.clone(), get_init_msg(0,0)).unwrap();
 
         // store batch
         let res = execute(
@@ -339,7 +412,7 @@ mod tests {
 
         let res: OwnerOfResponse = from_binary(&query(deps.as_ref(), mock_env(), query_msg).unwrap()).unwrap();
 
-        assert_eq!(res.owner, CREATOR);
+        assert_eq!(res.owner, ADMIN);
 
         let exec_mint = ExecuteMsg::MintBatch(BatchMintMsg {
             amount: Uint128::from(10u32)
@@ -357,7 +430,7 @@ mod tests {
         let res = execute(
             deps.as_mut(),
             mock_env(),
-            info.clone(),
+            info,
             ExecuteMsg::Burn{ token_id: String::from("0") }
         ).unwrap();
 
@@ -368,9 +441,9 @@ mod tests {
     #[test]
     fn owner_burn() {
         let mut deps = mock_dependencies();
-        let mut info = mock_info(CREATOR, &[]);
+        let mut info = mock_info(ADMIN, &[]);
 
-        let mut init_msg = get_init_msg();
+        let mut init_msg = get_init_msg(0,0);
 
         // ENABLE OWNERS BURN
         init_msg.owners_can_burn = true;
@@ -401,7 +474,7 @@ mod tests {
 
         let res: OwnerOfResponse = from_binary(&query(deps.as_ref(), mock_env(), query_msg).unwrap()).unwrap();
 
-        assert_eq!(res.owner, CREATOR);
+        assert_eq!(res.owner, ADMIN);
 
         let exec_mint = ExecuteMsg::MintBatch(BatchMintMsg {
             amount: Uint128::from(10u32)
@@ -422,7 +495,7 @@ mod tests {
         let res = execute(
             deps.as_mut(),
             mock_env(),
-            info.clone(),
+            info,
             ExecuteMsg::Burn{ token_id: String::from("0") }
         ).unwrap();
 
@@ -430,23 +503,6 @@ mod tests {
         assert_eq!(res.attributes[1].value, "owner_burn");
     }
 
-    #[test]
-    fn query_nft_info_batch() {
-        QueryMsg::NftInfoBatch{
-            tokens: vec![
-                String::from("0"),
-                String::from("1"),
-            ]
-        };
-    }
-
-
-    #[test]
-    fn query_burned() {
-        QueryMsg::BurntList{
-            address: Addr::unchecked(FUNDWALLET)
-        };
-    }
 }
 
 // TODO: Add store conf tests

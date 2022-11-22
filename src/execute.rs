@@ -27,15 +27,13 @@ use crate::helpers::{
     try_mint,
     try_store,
     burn_and_update,
-    update_total
+    update_total,
 };
 
 use crate::error::ContractError;
 
 use crate::msg::{ BatchStoreMsg, BatchMintMsg, StoreConfMsg };
 
-
-// TODO: AT START MINTER AND OWNER IS THE SAME SO IT WILL ENTER OWNER BURN
 pub fn execute_burn(
     deps: DepsMut,
     info: MessageInfo,
@@ -43,9 +41,14 @@ pub fn execute_burn(
 ) -> Result<Response, ContractError> {
     let cw721_contract = CW721Contract::default();
     let config = CONFIG.load(deps.storage)?;
+    let minter = cw721_contract.minter.load(deps.storage).unwrap();
 
     if config.owners_can_burn {
         let token = cw721_contract.tokens.load(deps.storage, &token_id)?;
+
+        if token.owner == minter {
+            return Err(ContractError::Unauthorized {})
+        }
 
         if token.owner != info.sender {
             return Err(ContractError::Unauthorized {})
@@ -91,7 +94,6 @@ pub fn execute_burn(
     )
 }
 
-// TODO: AT START MINTER AND OWNER IS THE SAME SO IT WILL ENTER OWNER BURN
 pub fn execute_burn_batch(
     deps: DepsMut,
     info: MessageInfo,
@@ -99,6 +101,7 @@ pub fn execute_burn_batch(
 ) -> Result<Response, ContractError> {
     let cw721_contract = CW721Contract::default();
     let config = CONFIG.load(deps.storage)?;
+    let minter = cw721_contract.minter.load(deps.storage).unwrap();
 
     if tokens.len() > 30 {
         return Err(ContractError::RequestTooLarge{ size: tokens.len() })
@@ -109,30 +112,30 @@ pub fn execute_burn_batch(
     }
 
     if config.owners_can_burn {
-        let mut burnt_tokens = vec![];
-        let mut not_burnt_tokens = vec![];
-        let mut errors : Vec<String> = vec![];
+        let mut burnt_tokens = Vec::with_capacity(tokens.len());
+        let mut not_burnt_tokens = Vec::with_capacity(tokens.len());
+        let mut errors : Vec<String> = Vec::with_capacity(tokens.len());
 
         for token_id in tokens {
             let token = cw721_contract.tokens.load(deps.storage, &token_id)?;
 
-            if token.owner != info.sender {
-                return Err(ContractError::Unauthorized {})
-            }
-
-            let res = burn_and_update(
-                &cw721_contract,
-                deps.storage,
-                token_id.clone(),
-                info.sender.clone(),
-                true
-            );
-
-            if res.is_err() {
-                not_burnt_tokens.push(token_id);
-                errors.push(res.unwrap_err().to_string())
+            if token.owner == minter || token.owner != info.sender {
+                errors.push(ContractError::Unauthorized {}.to_string())
             } else {
-                burnt_tokens.push(token_id);
+                let res = burn_and_update(
+                    &cw721_contract,
+                    deps.storage,
+                    token_id.clone(),
+                    info.sender.clone(),
+                    true
+                );
+
+                if let Err(e) = res {
+                    not_burnt_tokens.push(token_id);
+                    errors.push(e.to_string())
+                } else {
+                    burnt_tokens.push(token_id);
+                }
             }
         }
 
@@ -140,11 +143,14 @@ pub fn execute_burn_batch(
 
         res = res
             .add_attribute("action", "burn_batch")
-            .add_attribute("type", "owner_burn")
-            .add_attribute("tokens", format!("[{}]", burnt_tokens.join(",")));
+            .add_attribute("type", "owner_burn");
+
+        if !burnt_tokens.is_empty() {
+            res = res.add_attribute("burnt_tokens", format!("[{}]", burnt_tokens.join(",")));
+        }
 
         if !not_burnt_tokens.is_empty() {
-            res = res.add_attribute("not_burn", format!("[{}]", not_burnt_tokens.join(",")));
+            res = res.add_attribute("not_burnt", format!("[{}]", not_burnt_tokens.join(",")));
         }
 
         if !errors.is_empty() {
@@ -158,8 +164,8 @@ pub fn execute_burn_batch(
         // validate sender permissions
         can_update(&deps, &info)?;
 
-        let mut burnt_tokens = vec![];
-        let mut not_burnt_tokens = vec![];
+        let mut burnt_tokens = Vec::with_capacity(tokens.len());
+        let mut not_burnt_tokens = Vec::with_capacity(tokens.len());
 
         for token_id in tokens {
             let res = burn_and_update(
@@ -208,20 +214,20 @@ pub fn execute_mint(
     let config = CONFIG.load(deps.storage)?;
     let minter = cw721_contract.minter.load(deps.storage)?;
     let current_count = cw721_contract.token_count(deps.storage)?;
+    let mint_amount = Uint128::from(1u32);
 
     // check if we can mint
     let current_token_id = can_mint(
         &current_count,
         &env.block.time,
-        &config.start_mint,
-        config.token_total,
-        config.token_supply,
+        &config,
+        &mint_amount,
         &minter,
         &info.sender
     )?;
 
     // validate funds according to set price
-    let coin_found = can_pay(&config, &info, Uint128::from(1u32))?;
+    let coin_found = can_pay(&config, &info, mint_amount)?;
 
     try_mint(
         deps.storage,
@@ -259,23 +265,14 @@ pub fn execute_mint_batch(
     let minted_total = cw721_contract.token_count(deps.storage)?;
     let minter = cw721_contract.minter.load(deps.storage)?;
 
-    let mut mint_amount = msg.amount;
-
-    if mint_amount == Uint128::from(0u32) {
-        mint_amount = Uint128::from(1u32)
-    }
-
-    if mint_amount > config.max_mint_batch {
-        mint_amount = config.max_mint_batch
-    }
+    let mint_amount = msg.amount;
 
     // check if we can mint
     let mut current_token_id = can_mint(
         &minted_total,
         &env.block.time,
-        &config.start_mint,
-        config.token_total,
-        config.token_supply,
+        &config,
+        &msg.amount,
         &minter,
         &info.sender
     )?;
@@ -356,13 +353,14 @@ pub fn execute_store_batch(
     let cw721_contract = CW721Contract::default();
     let minter = cw721_contract.minter.load(deps.storage)?;
 
-    let mut total = CONFIG.load(deps.storage)?.token_total;
-    for nft_data in data.batch {
-        try_store(deps.storage, &nft_data, &minter, &cw721_contract)?;
-        total += Uint128::from(1u8)
+    for nft_data in &data.batch {
+        try_store(deps.storage, nft_data, &minter, &cw721_contract)?;
     }
 
-    update_total(deps.storage, total)?;
+    let batch_total = Uint128::from(data.batch.len() as u32);
+
+    // batch size is summed in the operation below and returns the new total
+    let total = update_total(deps.storage, batch_total)?;
 
     Ok(Response::new()
         .add_attribute("action", "store_batch")
@@ -381,28 +379,32 @@ pub fn execute_store_conf(
     let cw721_contract = CW721Contract::default();
     let minter = cw721_contract.minter.load(deps.storage)?;
 
-    let mut config = CONFIG.load(deps.storage)?.store_conf;
-    if config.is_none() && msg.conf.is_none() {
+    let mut store_conf = CONFIG.load(deps.storage)?.store_conf;
+
+    // check if we have store_conf from any of this two sources
+    if store_conf.is_none() && msg.conf.is_none() {
         return Err(ContractError::NoConfiguration {})
     }
 
+    // overwrite the original if we have data in the msg
     if msg.conf.is_some() {
-        config = msg.conf
+        store_conf = msg.conf
     }
 
-    let conf = config.unwrap();
+    // unwrap store_conf
+    let store_data = store_conf.unwrap();
 
     let mut total = CONFIG.load(deps.storage)?.token_total;
 
     for attr_values in msg.attributes {
-        let name = format!("{} #{}", conf.name, total);
+        let name = format!("{} #{}", store_data.name, total);
 
         let mut attr : Vec<Trait> = vec![];
         for (index, value) in attr_values.iter().enumerate() {
             attr.push(Trait {
                 display_type: None,
                 value: value.clone(),
-                trait_type: conf.attributes[index].clone()
+                trait_type: store_data.attributes[index].clone()
             })
         }
 
@@ -412,8 +414,8 @@ pub fn execute_store_conf(
             token_uri: None,
             extension: Some(Metadata {
                 name: Some(name.clone()),
-                description: Some(conf.desc.to_string()),
-                image: Some(format!("{}/{}.png", conf.ipfs, total)),
+                description: Some(store_data.desc.to_string()),
+                image: Some(format!("{}/{}.png", store_data.ipfs, total)),
                 attributes: Some(attr),
                 animation_url: None,
                 background_color: None,
@@ -428,7 +430,7 @@ pub fn execute_store_conf(
         total += Uint128::from(1u8)
     }
 
-    update_total(deps.storage, total)?;
+    total = update_total(deps.storage, total)?;
 
     Ok(Response::new()
         .add_attribute("action", "store_conf")

@@ -1,8 +1,3 @@
-use std::time::{
-  SystemTime,
-  UNIX_EPOCH
-};
-
 use cosmwasm_std::{
   DepsMut,
   MessageInfo,
@@ -13,8 +8,8 @@ use cosmwasm_std::{
   Timestamp
 };
 
-use cw721_base::{ MintMsg };
-use cw721_base::state::{ TokenInfo };
+use cw721_base::MintMsg;
+use cw721_base::state::TokenInfo;
 
 // use crate::msg::StoreConf;
 
@@ -30,8 +25,9 @@ use crate::state::{
 
 use crate::error::ContractError;
 
+// only used in tests
 pub fn _now() -> Timestamp {
-  Timestamp::from_seconds(SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs())
+  Timestamp::from_seconds(0)
 }
 
 pub fn can_update(
@@ -39,13 +35,10 @@ pub fn can_update(
   info: &MessageInfo
 ) -> Result<(), ContractError> {
   let cw721_contract = CW721Contract::default();
-
   let minter = cw721_contract.minter.load(deps.storage)?;
-
   if info.sender != minter {
       return Err(ContractError::Unauthorized {});
   }
-
   Ok(())
 }
 
@@ -115,12 +108,10 @@ pub fn can_store(
   info: &MessageInfo
 ) -> Result<(), ContractError> {
   can_update(deps, info)?;
-
   let config = CONFIG.load(deps.storage)?;
   if config.token_total >= config.token_supply {
       return Err(ContractError::MaxTokenSupply {});
   }
-
   Ok(())
 }
 
@@ -136,9 +127,9 @@ pub fn can_pay(
         Err(ContractError::WrongToken {})
       } else {
           let total = config.cost_amount * amount;
-          println!("NotEnoughFunds: {} {} {}", coin.amount < total, coin.amount, total);
+
           if coin.amount < total {
-              return Err(ContractError::NotEnoughFunds {});
+              return Err(ContractError::NotEnoughFunds {})
           }
 
           if coin.amount == total {
@@ -158,33 +149,54 @@ pub fn can_pay(
 pub fn can_mint(
   count: &u64,
   time: &Timestamp,
-  start_mint: &Option<Timestamp>,
-  token_total: Uint128,
-  token_supply: Uint128,
+  config: &Config,
+  mint_amount: &Uint128,
   minter: &Addr,
   sender: &Addr
 ) -> Result<Uint128, ContractError> {
-  if token_total == Uint128::from(0u32) {
+  // check if contract contain token data
+  if config.token_total == Uint128::from(0u32) {
       return Err(ContractError::CantMintNothing {});
   }
 
-  if let Some(stamp) = start_mint {
+  // check if mint amount is zero
+  if mint_amount.is_zero() {
+    return Err(ContractError::MintZero {  })
+  }
+
+  // validate max mint amount
+  if let Some(max_size) = &config.max_mint_batch {
+    if mint_amount > max_size {
+      return Err(ContractError::MintAmountLargerThanAllowed {  })
+    }
+  }
+
+  // check if start_mint date is some and if is correct
+  if let Some(stamp) = &config.start_mint {
     if time < stamp {
       return Err(ContractError::CantMintYet {})
     }
   }
 
+  // check if end_mint date is some and if it has pass over the limit
+  if let Some(stamp) = &config.end_mint {
+    if time > stamp {
+      return Err(ContractError::MintEnded {})
+    }
+  }
+
   let current_count = Uint128::from(*count);
 
-  if current_count == token_supply {
+  //
+  if current_count == config.token_supply {
     return Err(ContractError::MaxTokenSupply {});
   }
 
-  if current_count == token_total {
+  if current_count == config.token_total {
       return Err(ContractError::MaxTokens {});
   }
 
-  // dont allow contract minter to become owner of tokens
+  // dont allow contract admin to become owner of tokens
   if sender == minter {
       return Err(ContractError::Unauthorized {})
   }
@@ -195,11 +207,11 @@ pub fn can_mint(
 pub fn update_total(
   storage: &mut dyn Storage,
   amount: Uint128
-) -> Result<(), ContractError> {
+) -> Result<Uint128, ContractError> {
   let mut config = CONFIG.load(storage)?;
   config.token_total += amount;
   CONFIG.save(storage, &config)?;
-  Ok(())
+  Ok(config.token_total)
 }
 
 pub fn try_store(
