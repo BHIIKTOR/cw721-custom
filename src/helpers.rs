@@ -25,11 +25,6 @@ use crate::state::{
 
 use crate::error::ContractError;
 
-// only used in tests
-pub fn _now() -> Timestamp {
-  Timestamp::from_seconds(0)
-}
-
 pub fn can_update(
   deps: &DepsMut,
   info: &MessageInfo

@@ -29,12 +29,11 @@ mod general_tests {
     };
 
     use crate::tests::helpers::tests_helpers::{
+        now,
         get_init_msg,
         get_store_batch_msg,
         get_mint_msg,
     };
-
-    use crate::helpers::_now;
 
     const ADMIN: &str = "admin";
     const MINTER: &str = "minter";
@@ -140,7 +139,7 @@ mod general_tests {
         ]);
 
         let mut env = mock_env();
-        env.block.time = _now().plus_seconds(120);
+        env.block.time = now().plus_seconds(120);
 
         execute(deps.as_mut(), env, info, exec_mint).unwrap();
 
@@ -176,7 +175,7 @@ mod general_tests {
         });
 
         let mut env = mock_env();
-        env.block.time = _now();
+        env.block.time = now();
 
         // SEND EXACT AMOUNT FOR IT TO ACCEPT THE TRANSACTION
         execute(deps.as_mut(), env, mock_info(MINTER, &[
@@ -218,7 +217,7 @@ mod general_tests {
         });
 
         let mut env = mock_env();
-        env.block.time = _now();
+        env.block.time = now();
 
         // SEND EXACT AMOUNT FOR IT TO ACCEPT THE TRANSACTION
         execute(deps.as_mut(), env, mock_info(MINTER, &[
@@ -254,7 +253,7 @@ mod general_tests {
         let info = mock_info(MINTER, &[]);
 
         let mut env = mock_env();
-        env.block.time = _now().plus_seconds(120);
+        env.block.time = now().plus_seconds(120);
 
         execute(deps.as_mut(), env, info, exec_mint).unwrap();
     }
@@ -279,7 +278,7 @@ mod general_tests {
         ]);
 
         let mut env = mock_env();
-        env.block.time = _now().plus_seconds(120);
+        env.block.time = now().plus_seconds(120);
 
         execute(deps.as_mut(), env, info, ExecuteMsg::Mint()).unwrap();
     }
@@ -419,7 +418,7 @@ mod general_tests {
         });
 
         let mut env = mock_env();
-        env.block.time = _now();
+        env.block.time = now();
 
         // SEND EXACT AMOUNT FOR IT TO ACCEPT THE TRANSACTION
         execute(deps.as_mut(), env, mock_info(MINTER, &[
@@ -481,7 +480,7 @@ mod general_tests {
         });
 
         let mut env = mock_env();
-        env.block.time = _now();
+        env.block.time = now();
 
         // SEND EXACT AMOUNT FOR IT TO ACCEPT THE TRANSACTION
         execute(deps.as_mut(), env, mock_info(MINTER, &[

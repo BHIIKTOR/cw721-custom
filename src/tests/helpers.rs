@@ -23,6 +23,10 @@ pub mod tests_helpers {
   const SUPPLY: u128 = 20u128;
   const COST: u128 = 4000000u128;
 
+  pub fn now() -> Timestamp {
+    Timestamp::from_seconds(0)
+  }
+
   pub fn get_mint_msg (
     id: String
   ) -> MintMsg<Extension> {
