@@ -35,7 +35,7 @@ pub enum ContractError {
     #[error("Token not found")]
     TokenNotFound {},
 
-    #[error("Cannot update frozen contract")]
+    #[error("Contract is frozen")]
     ContractFrozen {},
 
     #[error("Token supply exhausted")]

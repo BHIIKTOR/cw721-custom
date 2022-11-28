@@ -16,7 +16,11 @@ mod general_tests {
 
     use cw721_base::MintMsg;
 
-    use crate::contract::{ execute, instantiate, query };
+    use crate::contract::{
+        execute,
+        instantiate,
+        query
+    };
 
     use crate::msg::{
         ExecuteMsg,
@@ -505,4 +509,6 @@ mod general_tests {
 }
 
 // TODO: Add store conf tests
-// arg
+// TODO: Add freeze test
+// TODO: Add update conf test
+

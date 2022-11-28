@@ -11,8 +11,6 @@ use cosmwasm_std::{
 use cw721_base::MintMsg;
 use cw721_base::state::TokenInfo;
 
-// use crate::msg::StoreConf;
-
 use crate::state::{
   CW721Contract,
   Extension,
@@ -75,22 +73,22 @@ pub fn update_burnt_list(
 pub fn burn_token(
   contract: &CW721Contract,
   storage: &mut dyn Storage,
-  token_id: String
+  token_id: &String
 ) -> Result<(), ContractError> {
   contract.tokens.remove(storage, &token_id)?;
   contract.decrement_tokens(storage)?;
-  BURNED.save(storage, token_id, &true)?;
+  BURNED.save(storage, token_id.clone(), &true)?;
   Ok(())
 }
 
 pub fn burn_and_update(
   contract: &CW721Contract,
   storage: &mut dyn Storage,
-  token_id: String,
-  sender: Addr,
+  token_id: &String,
+  sender: &Addr,
   update_list: bool
 ) -> Result<(), ContractError> {
-  burn_token(contract, storage, token_id.clone())?;
+  burn_token(contract, storage, &token_id)?;
   update_burnt_amount(storage, &sender)?;
   if update_list {
     update_burnt_list(storage, &sender, &token_id)?;
@@ -102,8 +100,17 @@ pub fn can_store(
   deps: &DepsMut,
   info: &MessageInfo
 ) -> Result<(), ContractError> {
+  // call can update to verify rights
   can_update(deps, info)?;
+
   let config = CONFIG.load(deps.storage)?;
+
+  // check if contract has been frozen
+  if config.frozen == true {
+    return Err(ContractError::ContractFrozen{})
+  }
+
+  // check if token total is not above token supply
   if config.token_total >= config.token_supply {
       return Err(ContractError::MaxTokenSupply {});
   }
@@ -113,7 +120,7 @@ pub fn can_store(
 pub fn can_pay(
   config: &Config,
   info: &MessageInfo,
-  amount: Uint128
+  amount: &Uint128
 ) -> Result<Coin, ContractError> {
   let mut coin_found: Coin = Coin::new(0, "none");
 
@@ -149,6 +156,11 @@ pub fn can_mint(
   minter: &Addr,
   sender: &Addr
 ) -> Result<Uint128, ContractError> {
+  // check if contract has been frozen
+  if config.frozen == true {
+    return Err(ContractError::ContractFrozen{})
+  }
+
   // check if contract contain token data
   if config.token_total == Uint128::from(0u32) {
       return Err(ContractError::CantMintNothing {});
@@ -182,11 +194,12 @@ pub fn can_mint(
 
   let current_count = Uint128::from(*count);
 
-  //
+  // we have hit current token supply
   if current_count == config.token_supply {
     return Err(ContractError::MaxTokenSupply {});
   }
 
+  // we have hit max total tokens in the collection
   if current_count == config.token_total {
       return Err(ContractError::MaxTokens {});
   }
@@ -201,7 +214,7 @@ pub fn can_mint(
 
 pub fn update_total(
   storage: &mut dyn Storage,
-  amount: Uint128
+  amount: &Uint128
 ) -> Result<Uint128, ContractError> {
   let mut config = CONFIG.load(storage)?;
   config.token_total += amount;

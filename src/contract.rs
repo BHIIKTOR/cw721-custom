@@ -14,6 +14,8 @@ pub use cw721_base::{
 };
 
 use crate::execute::{
+    execute_freeze,
+    execute_update_conf,
     execute_burn,
     execute_burn_batch,
     execute_mint,
@@ -88,6 +90,7 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
+        ExecuteMsg::Freeze{} => execute_freeze(deps, info),
         ExecuteMsg::Mint{} => execute_mint(env, deps, info),
         ExecuteMsg::MintBatch(mint_msg) => execute_mint_batch(env, deps, info, mint_msg),
         ExecuteMsg::Burn { token_id } => execute_burn(deps, info, token_id),
@@ -95,6 +98,7 @@ pub fn execute(
         ExecuteMsg::Store(store_msg) => execute_store(deps, info, store_msg),
         ExecuteMsg::StoreBatch(store_msg) => execute_store_batch(deps, info, store_msg),
         ExecuteMsg::StoreConf(msg) => execute_store_conf(deps, info, msg),
+        ExecuteMsg::UpdateConf(msg) => execute_update_conf(deps, info, msg),
         // CW721 methods
         _ => CW721Contract::default()
             .execute(deps, env, info, msg.into())

@@ -41,7 +41,9 @@ pub fn query_nft_info_batch(
         //     Some(item) => data.push(item),
         //     None => {}
         // }
-        if let Some(item) = contract.tokens.may_load(deps.storage, &token).unwrap() {
+        if let Some(item) = contract.tokens
+            .may_load(deps.storage, &token)
+            .unwrap() {
             data.push(item)
         }
     }
@@ -78,7 +80,11 @@ pub fn query_burned(
         //     Some(item) => data.push((token, item)),
         //     None => {}
         // }
-        if let Some(item) = BURNED.may_load(deps.storage, token.clone()).unwrap() { data.push((token, item)) }
+        if let Some(item) = BURNED
+            .may_load(deps.storage, token.clone())
+            .unwrap() {
+                data.push((token, item))
+         }
     }
 
     Ok(data)

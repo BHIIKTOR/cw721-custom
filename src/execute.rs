@@ -17,6 +17,7 @@ use crate::state::{
     CONFIG,
     Metadata,
     Trait,
+    Config,
 };
 
 use crate::helpers::{
@@ -32,7 +33,61 @@ use crate::helpers::{
 
 use crate::error::ContractError;
 
-use crate::msg::{ BatchStoreMsg, BatchMintMsg, StoreConfMsg };
+use crate::msg::{
+    BatchStoreMsg,
+    BatchMintMsg,
+    StoreConfMsg,
+    InstantiateMsg
+};
+
+pub fn execute_freeze(
+    deps: DepsMut,
+    info: MessageInfo,
+) -> Result<Response, ContractError> {
+    can_update(&deps, &info)?;
+
+    let mut config = CONFIG.load(deps.storage)?;
+    config.frozen = !config.frozen;
+
+    CONFIG.save(deps.storage, &config)?;
+
+    Ok(
+        Response::new()
+            .add_attribute("action", "freeze")
+            .add_attribute("result", "success")
+    )
+}
+
+pub fn execute_update_conf(
+    deps: DepsMut,
+    info: MessageInfo,
+    msg: InstantiateMsg,
+) -> Result<Response, ContractError> {
+    can_update(&deps, &info)?;
+
+    let config = Config {
+        frozen: false,
+        token_supply: msg.token_supply,
+        token_total: Uint128::from(0u128),
+        cost_denom: msg.cost_denom,
+        cost_amount: msg.cost_amount,
+        start_mint: Some(msg.start_mint).unwrap_or_default(),
+        end_mint: Some(msg.end_mint).unwrap_or_default(),
+        max_mint_batch: Some(msg.max_mint_batch).unwrap_or_else(|| Some(Uint128::from(10u128))),
+        owners_can_burn: msg.owners_can_burn,
+        minter_can_burn: msg.minter_can_burn,
+        funds_wallet: msg.funds_wallet,
+        store_conf: Some(msg.store_conf).unwrap(),
+    };
+
+    CONFIG.save(deps.storage, &config)?;
+
+    Ok(
+        Response::new()
+            .add_attribute("action", "update_config")
+            .add_attribute("result", "success")
+    )
+}
 
 pub fn execute_burn(
     deps: DepsMut,
@@ -57,8 +112,8 @@ pub fn execute_burn(
         burn_and_update(
             &cw721_contract,
             deps.storage,
-            token_id.clone(),
-            info.sender,
+            &token_id,
+            &info.sender,
             true
         )?;
 
@@ -75,8 +130,8 @@ pub fn execute_burn(
         burn_and_update(
             &cw721_contract,
             deps.storage,
-            token_id.clone(),
-            info.sender,
+            &token_id,
+            &info.sender,
             true
         )?;
 
@@ -125,8 +180,8 @@ pub fn execute_burn_batch(
                 let res = burn_and_update(
                     &cw721_contract,
                     deps.storage,
-                    token_id.clone(),
-                    info.sender.clone(),
+                    &token_id,
+                    &info.sender,
                     true
                 );
 
@@ -171,8 +226,8 @@ pub fn execute_burn_batch(
             let res = burn_and_update(
                 &cw721_contract,
                 deps.storage,
-                token_id.clone(),
-                info.sender.clone(),
+                &token_id,
+                &info.sender,
                 false
             );
 
@@ -227,7 +282,7 @@ pub fn execute_mint(
     )?;
 
     // validate funds according to set price
-    let coin_found = can_pay(&config, &info, mint_amount)?;
+    let coin_found = can_pay(&config, &info, &mint_amount)?;
 
     try_mint(
         deps.storage,
@@ -278,11 +333,19 @@ pub fn execute_mint_batch(
     )?;
 
     // validate funds according to set price and total to mint
-    let mut coin_found = can_pay(&config, &info, mint_amount)?;
+    let mut coin_found = can_pay(&config, &info, &mint_amount)?;
 
     let mut total_minted = 0u32;
 
     let mut ids: Vec<String> = vec![];
+
+    let mut response_msg = Response::new();
+
+    response_msg = response_msg.add_attribute("action", "mint_batch")
+        .add_attribute("owner", &info.sender)
+        .add_attribute("requested", msg.amount.to_string());
+
+    let mut errors : Vec<String> = Vec::new();
 
     while Uint128::from(total_minted) < mint_amount {
         let res = try_mint(
@@ -293,31 +356,38 @@ pub fn execute_mint_batch(
             &current_token_id.to_string()
         );
 
+        // push token id to the ids list
         if res.is_ok() {
             total_minted += 1;
             current_token_id += Uint128::from(1u32);
             ids.push(current_token_id.to_string())
         }
+
+        // push error msg to response msg
+        if res.is_err() {
+            errors.push(format!("{}:{}", current_token_id, res.unwrap_err().to_string()))
+        }
     }
 
     coin_found.amount = config.cost_amount * Uint128::from(total_minted);
 
-    // send funds to the configured funds wallet
-    // send the info below
-    Ok(Response::new()
-        .add_attribute("action", "mint_batch")
-        .add_attribute("owner", info.sender)
-        .add_attribute("requested", msg.amount.to_string())
-        .add_attribute("minted", total_minted.to_string())
+    response_msg = response_msg.add_attribute("minted", total_minted.to_string())
         .add_attribute("cost", coin_found.amount.to_string())
-        .add_attribute("list", format!("[{}]", ids.join(",")))
-        .add_message(
-            CosmosMsg::Bank(BankMsg::Send {
-                to_address: config.funds_wallet,
-                amount: vec![coin_found],
-            })
-        )
-    )
+        .add_attribute("list", format!("[{}]", ids.join(",")));
+
+    if !errors.is_empty() {
+        response_msg = response_msg.add_attribute("errors", format!("[{}]", errors.join(",")));
+    }
+
+    // send funds to the configured funds wallet
+    response_msg = response_msg.add_message(
+        CosmosMsg::Bank(BankMsg::Send {
+            to_address: config.funds_wallet,
+            amount: vec![coin_found],
+        })
+    );
+
+    Ok(response_msg)
 }
 
 pub fn execute_store(
@@ -334,7 +404,7 @@ pub fn execute_store(
     try_store(deps.storage, &nft_data, &minter, &cw721_contract)?;
 
     let total = CONFIG.load(deps.storage)?.token_total + Uint128::from(1u8);
-    update_total(deps.storage, total)?;
+    update_total(deps.storage, &total)?;
 
     Ok(Response::new()
         .add_attribute("action", "store")
@@ -360,7 +430,7 @@ pub fn execute_store_batch(
     let batch_total = Uint128::from(data.batch.len() as u32);
 
     // batch size is summed in the operation below and returns the new total
-    let total = update_total(deps.storage, batch_total)?;
+    let total = update_total(deps.storage, &batch_total)?;
 
     Ok(Response::new()
         .add_attribute("action", "store_batch")
@@ -378,23 +448,25 @@ pub fn execute_store_conf(
 
     let cw721_contract = CW721Contract::default();
     let minter = cw721_contract.minter.load(deps.storage)?;
-
-    let mut store_conf = CONFIG.load(deps.storage)?.store_conf;
+    let conf = CONFIG.load(deps.storage)?;
 
     // check if we have store_conf from any of this two sources
-    if store_conf.is_none() && msg.conf.is_none() {
+    // first the states CONFIG and second the StoreConfMsg in the TX
+    if conf.store_conf.is_none() && msg.conf.is_none() {
         return Err(ContractError::NoConfiguration {})
     }
 
+    let mut store_conf = conf.store_conf.unwrap();
+
     // overwrite the original if we have data in the msg
     if msg.conf.is_some() {
-        store_conf = msg.conf
+        store_conf = msg.conf.unwrap()
     }
 
     // unwrap store_conf
-    let store_data = store_conf.unwrap();
+    let store_data = store_conf;
 
-    let mut total = CONFIG.load(deps.storage)?.token_total;
+    let mut total = conf.token_total;
 
     for attr_values in msg.attributes {
         let name = format!("{} #{}", store_data.name, total);
@@ -430,7 +502,7 @@ pub fn execute_store_conf(
         total += Uint128::from(1u8)
     }
 
-    total = update_total(deps.storage, total)?;
+    total = update_total(deps.storage, &total)?;
 
     Ok(Response::new()
         .add_attribute("action", "store_conf")

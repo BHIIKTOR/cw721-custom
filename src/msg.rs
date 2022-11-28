@@ -60,8 +60,10 @@ pub struct InstantiateMsg {
     // if some end mint is the limit of minting phase
     pub end_mint: Option<Timestamp>,
 
-    pub cost_denom: String, // name of the token
-    pub cost_amount: Uint128, // amount
+    // name of the token
+    pub cost_denom: String,
+    // amount
+    pub cost_amount: Uint128,
 
     // maximum token supply
     pub token_supply: Uint128,
@@ -95,23 +97,32 @@ impl From<InstantiateMsg> for CW721InstantiateMsg {
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum ExecuteMsg {
-    // Destroys the NFT permanently.
+    // toggle freeze state
+    Freeze(),
+
+    // update the initial config
+    UpdateConf (InstantiateMsg),
+
+    // burn given token
     Burn {
         token_id: String,
     },
 
+    // burn tokens in batch
     BurnBatch {
         tokens: Vec<String>
     },
 
-    // Mint a new NFT, can only be called by the contract minter
+    // Mint a new token, can only be called by the contract minter
     Mint(),
+
+    // mint using a max configurable amount per batch
     MintBatch(BatchMintMsg),
 
-    // Store NFT metadata for later minting
+    // Store token metadata for later minting
     Store(MintMsg),
 
-    // Store NFT metadata in batch for later minting
+    // Store token metadata in batch for later minting
     StoreBatch(BatchStoreMsg),
 
     // Optimized batch token metadata storage
