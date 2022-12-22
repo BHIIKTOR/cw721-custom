@@ -23,6 +23,7 @@ use crate::state::{
 
 use crate::error::ContractError;
 
+// Check if sender is the configured contract owner or minter so they can update data
 pub fn can_update(
   deps: &DepsMut,
   info: &MessageInfo
@@ -35,6 +36,7 @@ pub fn can_update(
   Ok(())
 }
 
+// Update the amount of burnt tokens by a given address
 pub fn update_burnt_amount(
   storage: &mut dyn Storage,
   sender: &Addr,
@@ -52,6 +54,7 @@ pub fn update_burnt_amount(
   }
 }
 
+// Update list of burnt tokens by given address
 pub fn update_burnt_list(
   storage: &mut dyn Storage,
   sender: &Addr,
@@ -70,17 +73,19 @@ pub fn update_burnt_list(
   }
 }
 
+// burn a token
 pub fn burn_token(
   contract: &CW721Contract,
   storage: &mut dyn Storage,
   token_id: &String
 ) -> Result<(), ContractError> {
-  contract.tokens.remove(storage, &token_id)?;
+  contract.tokens.remove(storage, token_id)?;
   contract.decrement_tokens(storage)?;
   BURNED.save(storage, token_id.clone(), &true)?;
   Ok(())
 }
 
+// burn a token and update totals
 pub fn burn_and_update(
   contract: &CW721Contract,
   storage: &mut dyn Storage,
@@ -88,14 +93,15 @@ pub fn burn_and_update(
   sender: &Addr,
   update_list: bool
 ) -> Result<(), ContractError> {
-  burn_token(contract, storage, &token_id)?;
-  update_burnt_amount(storage, &sender)?;
+  burn_token(contract, storage, token_id)?;
+  update_burnt_amount(storage, sender)?;
   if update_list {
-    update_burnt_list(storage, &sender, &token_id)?;
+    update_burnt_list(storage, sender, token_id)?;
   }
   Ok(())
 }
 
+// Check if we can store tokens meta-data
 pub fn can_store(
   deps: &DepsMut,
   info: &MessageInfo
@@ -106,7 +112,7 @@ pub fn can_store(
   let config = CONFIG.load(deps.storage)?;
 
   // check if contract has been frozen
-  if config.frozen == true {
+  if config.frozen {
     return Err(ContractError::ContractFrozen{})
   }
 
@@ -114,15 +120,24 @@ pub fn can_store(
   if config.token_total >= config.token_supply {
       return Err(ContractError::MaxTokenSupply {});
   }
+
   Ok(())
 }
 
+// Check if
+// sender can pay for the token(s)
+// correct number of denoms
+// correct amount is sent
 pub fn can_pay(
   config: &Config,
   info: &MessageInfo,
   amount: &Uint128
 ) -> Result<Coin, ContractError> {
   let mut coin_found: Coin = Coin::new(0, "none");
+
+  if info.funds.len() > 1 {
+    return Err(ContractError::TooManyDenoms {})
+  }
 
   if let Some(coin) = info.funds.first() {
       if coin.denom != config.cost_denom {
@@ -134,20 +149,21 @@ pub fn can_pay(
               return Err(ContractError::NotEnoughFunds {})
           }
 
-          if coin.amount == total {
-              coin_found.denom = coin.denom.clone();
-              coin_found.amount = coin.amount;
-
-              Ok(coin_found)
-          } else {
-            Err(ContractError::IncorrectFunds {})
+          if coin.amount != total {
+            return Err(ContractError::IncorrectFunds {})
           }
+
+          coin_found.denom = coin.denom.clone();
+          coin_found.amount = coin.amount;
+
+          Ok(coin_found)
       }
   } else {
     Err(ContractError::NoFundsSent {})
   }
 }
 
+// Check if all conditions are meet and sender can mint
 pub fn can_mint(
   count: &u64,
   time: &Timestamp,
@@ -157,7 +173,7 @@ pub fn can_mint(
   sender: &Addr
 ) -> Result<Uint128, ContractError> {
   // check if contract has been frozen
-  if config.frozen == true {
+  if config.frozen {
     return Err(ContractError::ContractFrozen{})
   }
 
@@ -212,6 +228,7 @@ pub fn can_mint(
   Ok(current_count)
 }
 
+// Update total real tokens in the collection
 pub fn update_total(
   storage: &mut dyn Storage,
   amount: &Uint128
@@ -222,6 +239,7 @@ pub fn update_total(
   Ok(config.token_total)
 }
 
+// Attempt to store a token's meta-data
 pub fn try_store(
   storage: &mut dyn Storage,
   nft_data: &MintMsg<Extension>,
@@ -243,6 +261,7 @@ pub fn try_store(
   Ok(())
 }
 
+// Attempt to mint a token
 pub fn try_mint(
   storage: &mut dyn Storage,
   sender: &Addr,
