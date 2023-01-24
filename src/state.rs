@@ -12,16 +12,16 @@ pub type CW721Contract<'a> = cw721_base::Cw721Contract<'a, Extension, Empty>;
 
 pub const CONFIG: Item<Config> = Item::new("config");
 
+pub const BURNED: Map<String, bool> = Map::new("burned");
 pub const BURNT_AMOUNT: Map<&Addr, Uint128> = Map::new("burnt_amount");
 pub const BURNT_LIST: Map<&Addr, Vec<String>> = Map::new("burnt_list");
-pub const BURNED: Map<String, bool> = Map::new("burned");
 
 // use cw_utils::{Expiration, Scheduled};
 use crate::msg::StoreConf;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct Config {
-    pub frozen: bool,
+    pub name: String,
     pub token_supply: Uint128,
     pub token_total: Uint128,
     pub cost_denom: String,
@@ -32,7 +32,9 @@ pub struct Config {
     pub owners_can_burn: bool,
     pub minter_can_burn: bool,
     pub funds_wallet: String,
-    pub store_conf: Option<StoreConf>
+    pub store_conf: Option<StoreConf>,
+    pub frozen: bool,
+    pub paused: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, JsonSchema, Debug, Default)]

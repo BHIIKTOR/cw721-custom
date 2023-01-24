@@ -1,9 +1,12 @@
+use cosmwasm_std::entry_point;
+
 use cosmwasm_std::{
     Uint128,
     Addr,
     Deps,
     StdResult,
-    StdError
+    StdError,
+    Env
 };
 
 use crate::state::{

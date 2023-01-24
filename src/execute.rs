@@ -5,7 +5,7 @@ use cosmwasm_std::{
     Response,
     BankMsg,
     CosmosMsg,
-    Uint128,
+    Uint128, Storage,
 };
 
 use cw721_base::{ MintMsg };
@@ -21,6 +21,7 @@ use crate::state::{
 };
 
 use crate::helpers::{
+    transfer_nft,
     can_mint,
     can_pay,
     can_store,
@@ -37,7 +38,7 @@ use crate::msg::{
     BatchStoreMsg,
     BatchMintMsg,
     StoreConfMsg,
-    InstantiateMsg
+    InstantiateMsg, TransferOperation
 };
 
 pub fn execute_freeze(
@@ -47,14 +48,63 @@ pub fn execute_freeze(
     can_update(&deps, &info)?;
 
     let mut config = CONFIG.load(deps.storage)?;
-    config.frozen = !config.frozen;
+    config.frozen = true;
 
     CONFIG.save(deps.storage, &config)?;
 
     Ok(
         Response::new()
             .add_attribute("action", "freeze")
-            .add_attribute("result", "success")
+    )
+}
+
+pub fn execute_unfreeze(
+    deps: DepsMut,
+    info: MessageInfo,
+) -> Result<Response, ContractError> {
+    can_update(&deps, &info)?;
+
+    let mut config = CONFIG.load(deps.storage)?;
+    config.frozen = false;
+
+    CONFIG.save(deps.storage, &config)?;
+
+    Ok(
+        Response::new()
+            .add_attribute("action", "unfreeze")
+    )
+}
+
+pub fn execute_pause(
+    deps: DepsMut,
+    info: MessageInfo,
+) -> Result<Response, ContractError> {
+    can_update(&deps, &info)?;
+
+    let mut config = CONFIG.load(deps.storage)?;
+    config.paused = true;
+    CONFIG.save(deps.storage, &config)?;
+
+    Ok(
+        Response::new()
+            .add_attribute("action", "pause")
+    )
+}
+
+pub fn execute_unpause(
+    deps: DepsMut,
+    info: MessageInfo,
+) -> Result<Response, ContractError> {
+    can_update(&deps, &info)?;
+
+    let mut config = CONFIG.load(deps.storage)?;
+    config.paused = false;
+
+    CONFIG.save(deps.storage, &config)?;
+
+    Ok(
+        Response::new()
+            .add_attribute("action", "unpause")
     )
 }
 
@@ -66,7 +116,7 @@ pub fn execute_update_conf(
     can_update(&deps, &info)?;
 
     let config = Config {
-        frozen: false,
+        name: msg.name,
         token_supply: msg.token_supply,
         token_total: Uint128::from(0u128),
         cost_denom: msg.cost_denom,
@@ -78,18 +128,53 @@ pub fn execute_update_conf(
         minter_can_burn: msg.minter_can_burn,
         funds_wallet: msg.funds_wallet,
         store_conf: Some(msg.store_conf).unwrap(),
+        frozen: false,
+        paused: false,
     };
 
     CONFIG.save(deps.storage, &config)?;
 
     Ok(
         Response::new()
-            .add_attribute("action", "update_config")
+            .add_attribute("action", "config")
+            .add_attribute("sub", "update")
             .add_attribute("result", "success")
     )
 }
 
+pub fn execute_transfer_batch(
+    env: Env,
+    deps: DepsMut,
+    info: MessageInfo,
+    transfer: TransferOperation,
+) -> Result<Response, ContractError> {
+    let cw721_contract = CW721Contract::default();
+
+    let mut results = vec![];
+
+    let recipient_address = &deps.api.addr_validate(&transfer.recipient)?;
+
+    for token_id in transfer.tokens {
+        match transfer_nft(deps.storage, &env, &cw721_contract, &info, recipient_address, &token_id) {
+            Ok(transfer_res) => {
+                results.push(format!("{}, {}", token_id, transfer_res))
+            },
+            Err(e) => {
+                results.push(format!("{}, {}", token_id, e.to_string()))
+            },
+        }
+    }
+
+    Ok(
+        Response::new()
+            .add_attribute("action", "transfer_batch")
+            .add_attribute("recipient", transfer.recipient.to_string())
+            .add_attribute("result", format!("[{}]", results.join(", ")))
+    )
+}
+
 pub fn execute_burn(
+    env: Env,
     deps: DepsMut,
     info: MessageInfo,
     token_id: String,
@@ -101,11 +186,7 @@ pub fn execute_burn(
     if config.owners_can_burn {
         let token = cw721_contract.tokens.load(deps.storage, &token_id)?;
 
-        if token.owner == minter {
-            return Err(ContractError::Unauthorized {})
-        }
-
-        if token.owner != info.sender {
+        if token.owner == minter || token.owner != info.sender {
             return Err(ContractError::Unauthorized {})
         }
 
@@ -114,12 +195,13 @@ pub fn execute_burn(
             deps.storage,
             &token_id,
             &info.sender,
+            &env.block,
             true
         )?;
 
         return Ok(Response::new()
             .add_attribute("action", "burn")
-            .add_attribute("type", "owner_burn")
+            .add_attribute("sub", "owner_burn")
             .add_attribute("token_id", token_id))
     }
 
@@ -132,12 +214,13 @@ pub fn execute_burn(
             deps.storage,
             &token_id,
             &info.sender,
+            &env.block,
             true
         )?;
 
         return Ok(Response::new()
             .add_attribute("action", "burn")
-            .add_attribute("type", "minter_burn")
+            .add_attribute("sub", "minter_burn")
             .add_attribute("token_id", token_id))
     }
 
@@ -150,6 +233,7 @@ pub fn execute_burn(
 }
 
 pub fn execute_burn_batch(
+    env: Env,
     deps: DepsMut,
     info: MessageInfo,
     tokens: Vec<String>
@@ -166,98 +250,93 @@ pub fn execute_burn_batch(
         return Err(ContractError::RequestTooSmall{ size: tokens.len() })
     }
 
-    if config.owners_can_burn {
-        let mut burnt_tokens = Vec::with_capacity(tokens.len());
-        let mut not_burnt_tokens = Vec::with_capacity(tokens.len());
-        let mut errors : Vec<String> = Vec::with_capacity(tokens.len());
+    let mut burnt_tokens: Vec<String> = Vec::with_capacity(tokens.len());
+    let mut not_burnt_tokens: Vec<String> = Vec::with_capacity(tokens.len());
+    let mut errors: Vec<String> = Vec::with_capacity(tokens.len());
 
+    let mut response;
+
+    let mut handle_error = |
+        token_id: &String,
+        is_err: bool,
+        e: Option<ContractError>
+    | {
+        if is_err {
+            not_burnt_tokens.push(token_id.to_string());
+            errors.push(e.unwrap().to_string())
+        } else {
+            burnt_tokens.push(token_id.to_string());
+        }
+    };
+
+    let run_op = |
+        storage: &mut dyn Storage,
+        token_id: &String,
+        check_owner: bool
+    | -> Result<(), ContractError> {
+        burn_and_update(
+            &cw721_contract,
+            storage,
+            &token_id,
+            &info.sender,
+            &env.block,
+            check_owner
+        )
+    };
+
+    if config.owners_can_burn {
         for token_id in tokens {
             let token = cw721_contract.tokens.load(deps.storage, &token_id)?;
 
             if token.owner == minter || token.owner != info.sender {
-                errors.push(ContractError::Unauthorized {}.to_string())
+                handle_error(&token_id, true, Some(ContractError::Unauthorized {}))
             } else {
-                let res = burn_and_update(
-                    &cw721_contract,
-                    deps.storage,
-                    &token_id,
-                    &info.sender,
-                    true
-                );
+                let op_res = run_op(deps.storage, &token_id, true);
 
-                if let Err(e) = res {
-                    not_burnt_tokens.push(token_id);
-                    errors.push(e.to_string())
-                } else {
-                    burnt_tokens.push(token_id);
-                }
+                handle_error(&token_id, op_res.is_err(), op_res.err());
             }
         }
 
-        let mut res = Response::new();
-
-        res = res
+        response = Response::new()
             .add_attribute("action", "burn_batch")
-            .add_attribute("type", "owner_burn");
-
-        if !burnt_tokens.is_empty() {
-            res = res.add_attribute("burnt_tokens", format!("[{}]", burnt_tokens.join(",")));
-        }
-
-        if !not_burnt_tokens.is_empty() {
-            res = res.add_attribute("not_burnt", format!("[{}]", not_burnt_tokens.join(",")));
-        }
-
-        if !errors.is_empty() {
-            res = res.add_attribute("errors", format!("[{}]", errors.join(",")));
-        }
-
-        return Ok(res)
-    }
-
-    if config.minter_can_burn {
+            .add_attribute("sub", "owner_burn");
+    } else if config.minter_can_burn {
         // validate sender permissions
         can_update(&deps, &info)?;
 
-        let mut burnt_tokens = Vec::with_capacity(tokens.len());
-        let mut not_burnt_tokens = Vec::with_capacity(tokens.len());
-
         for token_id in tokens {
-            let res = burn_and_update(
-                &cw721_contract,
-                deps.storage,
-                &token_id,
-                &info.sender,
-                false
-            );
+            let op_res = run_op(deps.storage, &token_id, false);
 
-            if res.is_err() {
-                not_burnt_tokens.push(token_id)
-            } else {
-                burnt_tokens.push(token_id);
-            }
+            handle_error(&token_id, op_res.is_err(), op_res.err());
         }
 
-        let mut res = Response::new();
-
-        res = res
+        response = Response::new()
             .add_attribute("action", "burn_batch")
-            .add_attribute("type", "owner_burn")
+            .add_attribute("sub", "owner_burn")
             .add_attribute("tokens", format!("[{}]", burnt_tokens.join(",")));
-
-        if !not_burnt_tokens.is_empty() {
-            res = res.add_attribute("not_burn", format!("[{}]", not_burnt_tokens.join(",")));
-        }
-
-        return Ok(res)
+    } else {
+        response = Response::new()
+            .add_attribute("action", "burn_nothing")
+            .add_attribute("why", "configuration")
+            .add_attribute("owners_can_burn", config.owners_can_burn.to_string())
+            .add_attribute("minter_can_burn", config.minter_can_burn.to_string());
     }
 
-    Ok(Response::new()
-        .add_attribute("action", "burn_nothing")
-        .add_attribute("why", "configuration")
-        .add_attribute("owners_can_burn", config.owners_can_burn.to_string())
-        .add_attribute("minter_can_burn", config.minter_can_burn.to_string())
-    )
+    if response.attributes[0].value != "burn_nothing" {
+        if !burnt_tokens.is_empty() {
+            response = response.add_attribute("burnt_tokens", format!("[{}]", burnt_tokens.join(",")));
+        }
+
+        if !not_burnt_tokens.is_empty() {
+            response = response.add_attribute("not_burnt", format!("[{}]", not_burnt_tokens.join(",")));
+        }
+
+        if !errors.is_empty() {
+            response = response.add_attribute("errors", format!("[{}]", errors.join(",")));
+        }
+    }
+
+    Ok(response)
 }
 
 pub fn execute_mint(
@@ -348,6 +427,7 @@ pub fn execute_mint_batch(
     let mut errors : Vec<String> = Vec::new();
 
     while Uint128::from(total_minted) < mint_amount {
+        //atempt to mint
         let res = try_mint(
             deps.storage,
             &info.sender,
@@ -365,7 +445,7 @@ pub fn execute_mint_batch(
 
         // push error msg to response msg
         if res.is_err() {
-            errors.push(format!("{}:{}", current_token_id, res.unwrap_err().to_string()))
+            errors.push(format!("token: {}, error: {}", current_token_id, res.unwrap_err()))
         }
     }
 

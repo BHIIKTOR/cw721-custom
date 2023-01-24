@@ -5,23 +5,29 @@ use cosmwasm_std::{
   Uint128,
   Storage,
   Addr,
-  Timestamp
+  Timestamp,
+  Env,
+  BlockInfo, StdError
 };
 
-use cw721_base::MintMsg;
-use cw721_base::state::TokenInfo;
-
-use crate::state::{
-  CW721Contract,
-  Extension,
-  CONFIG,
-  Config,
-  BURNT_AMOUNT,
-  BURNT_LIST,
-  BURNED
+use cw721_base::{
+  state::TokenInfo,
+  MintMsg
 };
 
-use crate::error::ContractError;
+use crate::{
+  error::ContractError,
+  state::{
+    CW721Contract,
+    Extension,
+    CONFIG,
+    Config,
+    BURNT_AMOUNT,
+    BURNT_LIST,
+    BURNED,
+    Metadata
+  }
+};
 
 // Check if sender is the configured contract owner or minter so they can update data
 pub fn can_update(
@@ -73,15 +79,37 @@ pub fn update_burnt_list(
   }
 }
 
-// burn a token
-pub fn burn_token(
+pub fn check_token_exists_or_err(
   contract: &CW721Contract,
   storage: &mut dyn Storage,
   token_id: &String
 ) -> Result<(), ContractError> {
+  if !contract.tokens.has(storage, token_id) {
+    return Err(ContractError::TokenNotFound { token_id: token_id.to_string() })
+  }
+  Ok(())
+}
+
+// burn a token
+pub fn burn_token(
+  contract: &CW721Contract,
+  storage: &mut dyn Storage,
+  token_id: &String,
+  sender: &Addr,
+  check_owner: bool
+) -> Result<(), ContractError> {
+  check_token_exists_or_err(contract, storage, token_id)?;
+
+  if check_owner {
+    check_token_ownership_basic(contract, storage, sender, token_id)?;
+  }
+
   contract.tokens.remove(storage, token_id)?;
+
   contract.decrement_tokens(storage)?;
+
   BURNED.save(storage, token_id.clone(), &true)?;
+
   Ok(())
 }
 
@@ -91,13 +119,18 @@ pub fn burn_and_update(
   storage: &mut dyn Storage,
   token_id: &String,
   sender: &Addr,
-  update_list: bool
+  _block: &BlockInfo,
+  check_owner: bool
 ) -> Result<(), ContractError> {
-  burn_token(contract, storage, token_id)?;
+  burn_token(contract, storage, token_id, sender, check_owner)?;
+
   update_burnt_amount(storage, sender)?;
-  if update_list {
+
+  // add logs for whom of the owners burnt tokens
+  if check_owner {
     update_burnt_list(storage, sender, token_id)?;
   }
+
   Ok(())
 }
 
@@ -172,9 +205,14 @@ pub fn can_mint(
   minter: &Addr,
   sender: &Addr
 ) -> Result<Uint128, ContractError> {
-  // check if contract has been frozen
+  // check if contract is frozen
   if config.frozen {
     return Err(ContractError::ContractFrozen{})
+  }
+
+  // check if contract has been paused
+  if config.paused {
+    return Err(ContractError::ContractPaused{})
   }
 
   // check if contract contain token data
@@ -228,14 +266,129 @@ pub fn can_mint(
   Ok(current_count)
 }
 
+pub fn check_token_ownership_basic(
+  contract: &CW721Contract,
+  storage: &mut dyn Storage,
+  sender: &Addr,
+  token_id: &String,
+) -> Result<TokenInfo<Option<Metadata>>, ContractError> {
+  let token = contract.tokens.load(storage, token_id)?;
+
+  // owner can send
+  if token.owner == sender.clone() {
+    Ok(token)
+  } else {
+    Err(ContractError::Unauthorized {})
+  }
+}
+
+pub fn check_token_ownership_approvals(
+  token: &TokenInfo<Option<Metadata>>,
+  sender: &Addr,
+  block: &BlockInfo,
+) -> Result<(),ContractError> {
+  if token
+    .approvals
+    .iter()
+    .any(|apr| apr.spender == sender.clone() && !apr.is_expired(&block))
+  {
+    Ok(())
+  } else {
+    Err(ContractError::Unauthorized {})
+  }
+}
+
+pub fn check_token_ownership_operators(
+  contract: &CW721Contract,
+  storage: &mut dyn Storage,
+  owner: &Addr,
+  sender: &Addr,
+  block: &BlockInfo,
+) -> Result<(), StdError> {
+  let op = contract
+    .operators
+    .may_load(storage, (&owner, &sender));
+
+  if op.is_err() {
+    return Err(op.unwrap_err())
+  }
+
+  if op.is_ok() {
+    let ex = op.unwrap().unwrap();
+    if ex.is_expired(&block) {
+      return Err(StdError::GenericErr { msg: "expired block".to_string() })
+    }
+  }
+
+  Ok(())
+}
+
+pub fn check_token_ownership_complete(
+  contract: &CW721Contract,
+  storage: &mut dyn Storage,
+  block: &BlockInfo,
+  sender: &Addr,
+  token_id: &String,
+) -> Result<TokenInfo<Option<Metadata>>, ContractError> {
+  let check_basic = check_token_ownership_basic(&contract, storage, &sender, &token_id);
+
+  // owner can send
+  if check_basic.is_ok() {
+    return Ok(check_basic.unwrap())
+  }
+
+  let token = check_basic.unwrap();
+  // any non-expired token approval can send
+  if check_token_ownership_approvals(&token, &sender, &block).is_ok() {
+    return Ok(token)
+  }
+
+  // operator can send
+  if check_token_ownership_operators(&contract, storage, &token.owner, sender, block).is_ok() {
+    return Ok(token)
+  }
+
+  Err(ContractError::Unauthorized {  })
+}
+
+pub fn transfer_nft(
+  storage: &mut dyn Storage,
+  env: &Env,
+  contract: &CW721Contract,
+  info: &MessageInfo,
+  recipient: &Addr,
+  token_id: &String,
+) -> Result<String, ContractError> {
+  check_token_exists_or_err(contract, storage, &token_id)?;
+
+  // ensure we have permissions
+  let mut token = check_token_ownership_complete(contract, storage, &env.block, &info.sender, token_id)?;
+
+  // set owner and remove existing approvals
+  token.owner = recipient.clone();
+  token.approvals = vec![];
+
+  contract.tokens.save(storage, token_id, &token)?;
+
+  Ok(token_id.to_string())
+}
+
 // Update total real tokens in the collection
 pub fn update_total(
   storage: &mut dyn Storage,
   amount: &Uint128
 ) -> Result<Uint128, ContractError> {
   let mut config = CONFIG.load(storage)?;
-  config.token_total += amount;
+
+  let total = config.token_total.checked_add(amount.clone());
+
+  if total.is_err() {
+    return Err(ContractError::CantUpdateTotal {})
+  }
+
+  config.token_total = total.unwrap();
   CONFIG.save(storage, &config)?;
+
   Ok(config.token_total)
 }
 
@@ -267,15 +420,20 @@ pub fn try_mint(
   sender: &Addr,
   minter: &Addr,
   contract: &CW721Contract,
-  current: &String
+  token_id: &String
 ) -> Result<(), ContractError> {
-  let old_token = contract.tokens.load(storage, current)?;
+  check_token_exists_or_err(contract, storage, token_id)?;
+
+  let old_token = contract.tokens.load(storage, token_id)?;
+
   if old_token.owner != minter.clone() {
     return Err(ContractError::Claimed {})
   }
+
   let mut new_token = old_token.clone();
   new_token.owner = sender.clone();
-  contract.tokens.replace(storage, current, Some(&new_token), Some(&old_token))?;
+  contract.tokens.replace(storage, token_id, Some(&new_token), Some(&old_token))?;
   contract.increment_tokens(storage)?;
+
   Ok(())
 }

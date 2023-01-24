@@ -1,25 +1,30 @@
-# cw721-offchain-randomization
+# cw721-custom
 
 The whole idea of this contract is to allow people to skip the two contract layout for usual token contracts in CW.
+
 It lacks things, like minting a random token instead of doing it sequentially, but this is a WPI (so far).
 
 The contract allows for three different types of storing methods:
-* store - 1:1 data storage (based on opensea medata)
-* store batch - 1:1 data storage (based on opensea medata) but in batch
-* store conf - and optimized method that allows to send the repetitive info once and the attributes for the metadata in mass
+* store - 1:1 data storage (based on opensea meta-data)
+* store batch - 1:1 data storage (based on opensea meta-data) but in batch
+* store conf - An optimized TX that accepts the repetitive info once and the attributes for the metadata in bulk
 
-It also allows to mint one token or mint many.
+It also allows to mint one token or mint in batch with configurable max amount.
 
-It also allows the new owner of the token to burn their tokens based on configuration and disallow the original minter to rebuy or burn the tokens
+It also allows the new owner of the token to burn their tokens based on configuration
+and disallow the original minter to rebuy or burn the tokens
 
-## Quick list of features
+## Quick list of features (so far).
 
-* Owners can burn tokens
+* Batch burn and mint
+* Configuration for token owners to be able to burn tokens
 * Configurable denom and amount
-* Increasiable current supply but configurable total supply
+* Increasiable current supply and configurable total supply
 * Mint start date
 * Funds wallet
 * Max mint batch
+* Toggle freeze contract operations
+* Migratable
 * InitMsg store conf (see exameple below)
 
 ## InitMsg

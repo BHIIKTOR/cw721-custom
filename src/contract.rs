@@ -1,5 +1,6 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
+
 use cosmwasm_std::{to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Uint128};
 
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg };
@@ -14,6 +15,7 @@ pub use cw721_base::{
 };
 
 use crate::execute::{
+    execute_transfer_batch,
     execute_freeze,
     execute_update_conf,
     execute_burn,
@@ -23,6 +25,8 @@ use crate::execute::{
     execute_store,
     execute_store_batch,
     execute_store_conf,
+    execute_pause,
+    execute_unpause, execute_unfreeze,
 };
 
 use crate::error::ContractError;
@@ -49,7 +53,7 @@ pub fn instantiate(
     msg: InstantiateMsg,
 ) -> StdResult<Response> {
     let config = Config {
-        frozen: false,
+        name: msg.name.clone(),
         token_supply: msg.token_supply,
         token_total: Uint128::from(0u128),
         cost_denom: msg.cost_denom,
@@ -61,6 +65,8 @@ pub fn instantiate(
         minter_can_burn: msg.minter_can_burn,
         funds_wallet: msg.funds_wallet,
         store_conf: Some(msg.store_conf).unwrap(),
+        frozen: false,
+        paused: false,
     };
 
     // We use the set_contract_version function that we loaded above using cw2
@@ -91,14 +97,18 @@ pub fn execute(
 ) -> Result<Response, ContractError> {
     match msg {
         ExecuteMsg::Freeze{} => execute_freeze(deps, info),
+        ExecuteMsg::Unfreeze{} => execute_unfreeze(deps, info),
+        ExecuteMsg::Pause{} => execute_pause(deps, info),
+        ExecuteMsg::Unpause{} => execute_unpause(deps, info),
         ExecuteMsg::Mint{} => execute_mint(env, deps, info),
         ExecuteMsg::MintBatch(mint_msg) => execute_mint_batch(env, deps, info, mint_msg),
-        ExecuteMsg::Burn { token_id } => execute_burn(deps, info, token_id),
-        ExecuteMsg::BurnBatch { tokens } => execute_burn_batch(deps, info, tokens),
+        ExecuteMsg::Burn { token_id } => execute_burn(env, deps, info, token_id),
+        ExecuteMsg::BurnBatch { tokens } => execute_burn_batch(env, deps, info, tokens),
         ExecuteMsg::Store(store_msg) => execute_store(deps, info, store_msg),
         ExecuteMsg::StoreBatch(store_msg) => execute_store_batch(deps, info, store_msg),
         ExecuteMsg::StoreConf(msg) => execute_store_conf(deps, info, msg),
         ExecuteMsg::UpdateConf(msg) => execute_update_conf(deps, info, msg),
+        ExecuteMsg::TransferBatch(transfer) => execute_transfer_batch(env, deps, info, transfer),
         // CW721 methods
         _ => CW721Contract::default()
             .execute(deps, env, info, msg.into())

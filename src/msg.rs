@@ -1,3 +1,4 @@
+// use cosmwasm_schema::cw_serde;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -19,6 +20,12 @@ pub type MintMsg = CW721MintMsg<Extension>;
 pub struct BatchStoreMsg {
     // pub batch: [CW721MintMsg<Extension>; 50],
     pub batch: Vec<CW721MintMsg<Extension>>
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct TransferOperation {
+    pub recipient: String,
+    pub tokens: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
@@ -80,6 +87,7 @@ pub struct InstantiateMsg {
     // turn this off to do not allow the contract owner to burn tokens
     pub minter_can_burn: bool,
 
+    // Used for StoreConf call but can be provided during the call
     pub store_conf: Option<StoreConf>,
 }
 
@@ -97,8 +105,17 @@ impl From<InstantiateMsg> for CW721InstantiateMsg {
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum ExecuteMsg {
-    // toggle freeze state
+    // freeze contract
     Freeze(),
+
+    // unfreeze contract
+    Unfreeze(),
+
+    // pause contract
+    Pause(),
+
+    // unpause contract
+    Unpause(),
 
     // update the initial config
     UpdateConf (InstantiateMsg),
@@ -134,6 +151,14 @@ pub enum ExecuteMsg {
         recipient: String,
         token_id: String,
     },
+
+    // Transfer a batch of nfts to a single recipient
+    TransferBatch(TransferOperation),
+
+    // Transfer a multiple nfts to multiple recipients
+    // TransferOperations {
+    //     tx: Vec<TransferOperation>,
+    // },
 
     // Send is a base message to transfer a token to a contract and trigger an action
     // on the receiving contract.

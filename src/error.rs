@@ -32,11 +32,14 @@ pub enum ContractError {
     #[error("Mint amount is larger than allowed")]
     MintAmountLargerThanAllowed {},
 
-    #[error("Token not found")]
-    TokenNotFound {},
+    #[error("Token ({token_id}) not found")]
+    TokenNotFound { token_id: String },
 
     #[error("Contract is frozen")]
     ContractFrozen {},
+
+    #[error("Contract is paused")]
+    ContractPaused {},
 
     #[error("Token supply exhausted")]
     MaxTokenSupply {},
@@ -56,6 +59,9 @@ pub enum ContractError {
 
     #[error("Amount of funds sends are not equal to the required total")]
     IncorrectFunds {},
+
+    #[error("Too many denoms were sent")]
+    TooManyDenoms {},
 
     //NoFundsSent
     #[error("No funds sent")]
@@ -86,6 +92,9 @@ pub enum ContractError {
 
     #[error("Failed to update burn token list")]
     FailedBurnedUpdateList {},
+
+    #[error["Failed to update total tokens"]]
+    CantUpdateTotal {},
 
     #[error("Error {error}")]
     DelegateError { error: StdError },
