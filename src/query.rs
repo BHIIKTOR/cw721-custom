@@ -1,4 +1,4 @@
-use cosmwasm_std::entry_point;
+// use cosmwasm_std::entry_point;
 
 use cosmwasm_std::{
     Uint128,
@@ -6,7 +6,7 @@ use cosmwasm_std::{
     Deps,
     StdResult,
     StdError,
-    Env
+    // Env
 };
 
 use crate::state::{

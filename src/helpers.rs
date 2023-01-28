@@ -35,10 +35,13 @@ pub fn can_update(
   info: &MessageInfo
 ) -> Result<(), ContractError> {
   let cw721_contract = CW721Contract::default();
+
   let minter = cw721_contract.minter.load(deps.storage)?;
+
   if info.sender != minter {
       return Err(ContractError::Unauthorized {});
   }
+
   Ok(())
 }
 

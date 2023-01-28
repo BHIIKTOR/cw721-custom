@@ -25,7 +25,7 @@ mod general_tests {
     use crate::msg::{
         ExecuteMsg,
         QueryMsg,
-        BatchMintMsg,
+        MintBatchMsg,
     };
 
     use cw721::{
@@ -174,7 +174,7 @@ mod general_tests {
         ).unwrap();
 
         // MINTING 10 TOKENS
-        let exec_mint = ExecuteMsg::MintBatch(BatchMintMsg {
+        let exec_mint = ExecuteMsg::MintBatch(MintBatchMsg {
             amount: Uint128::from(10u32)
         });
 
@@ -216,7 +216,7 @@ mod general_tests {
         ).unwrap();
 
         // TRY TO MINT 10 TOKENS
-        let exec_mint = ExecuteMsg::MintBatch(BatchMintMsg {
+        let exec_mint = ExecuteMsg::MintBatch(MintBatchMsg {
             amount: Uint128::from(10u32)
         });
 
@@ -417,7 +417,7 @@ mod general_tests {
 
         assert_eq!(res.owner, ADMIN);
 
-        let exec_mint = ExecuteMsg::MintBatch(BatchMintMsg {
+        let exec_mint = ExecuteMsg::MintBatch(MintBatchMsg {
             amount: Uint128::from(10u32)
         });
 
@@ -479,7 +479,7 @@ mod general_tests {
 
         assert_eq!(res.owner, ADMIN);
 
-        let exec_mint = ExecuteMsg::MintBatch(BatchMintMsg {
+        let exec_mint = ExecuteMsg::MintBatch(MintBatchMsg {
             amount: Uint128::from(10u32)
         });
 
@@ -510,5 +510,7 @@ mod general_tests {
 
 // TODO: Add store conf tests
 // TODO: Add freeze test
+// TODO: Add pause test
 // TODO: Add update conf test
+// TODO: Add transfer batch test
 

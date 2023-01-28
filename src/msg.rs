@@ -29,18 +29,29 @@ pub struct TransferOperation {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
-pub struct BatchMintMsg {
+pub struct MintBatchMsg {
     // pub batch: [CW721MintMsg<Extension>; 50],
     pub amount: Uint128
+}
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+pub struct RemoteMintBatchMsg {
+    pub owner: String,
+    pub amount: Uint128
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+pub struct RemoteBurnBatchMsg {
+    pub owner: String,
+    pub tokens: Vec<String>,
 }
 
 use cw721::Expiration;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct StoreConf {
-    pub ipfs: String,
-    pub desc: String,
     pub name: String,
+    pub desc: String,
+    pub ipfs: String,
     pub attributes: Vec<String>,
 }
 
@@ -126,15 +137,15 @@ pub enum ExecuteMsg {
     },
 
     // burn tokens in batch
-    BurnBatch {
-        tokens: Vec<String>
-    },
+    BurnBatch { tokens: Vec<String> },
+    RemoteBurnBatch{ tokens: Vec<String>, owner: String },
 
     // Mint a new token, can only be called by the contract minter
     Mint(),
 
     // mint using a max configurable amount per batch
-    MintBatch(BatchMintMsg),
+    MintBatch(MintBatchMsg),
+    RemoteMintBatch{ amount: Uint128, owner: String },
 
     // Store token metadata for later minting
     Store(MintMsg),

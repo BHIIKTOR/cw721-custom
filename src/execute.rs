@@ -36,7 +36,7 @@ use crate::error::ContractError;
 
 use crate::msg::{
     BatchStoreMsg,
-    BatchMintMsg,
+    MintBatchMsg,
     StoreConfMsg,
     InstantiateMsg, TransferOperation
 };
@@ -390,7 +390,7 @@ pub fn execute_mint_batch(
     env: Env,
     deps: DepsMut,
     info: MessageInfo,
-    msg: BatchMintMsg,
+    msg: MintBatchMsg,
 ) -> Result<Response, ContractError> {
     let cw721_contract = CW721Contract::default();
 

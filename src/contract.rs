@@ -3,6 +3,7 @@ use cosmwasm_std::entry_point;
 
 use cosmwasm_std::{to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Uint128};
 
+use crate::execute_remote::{execute_remote_burn_batch, execute_remote_mint_batch};
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg };
 use crate::state::{Config, CW721Contract, CONFIG};
 
@@ -102,8 +103,10 @@ pub fn execute(
         ExecuteMsg::Unpause{} => execute_unpause(deps, info),
         ExecuteMsg::Mint{} => execute_mint(env, deps, info),
         ExecuteMsg::MintBatch(mint_msg) => execute_mint_batch(env, deps, info, mint_msg),
+        ExecuteMsg::RemoteMintBatch { owner, amount } => execute_remote_mint_batch(env, deps, info, amount, owner),
         ExecuteMsg::Burn { token_id } => execute_burn(env, deps, info, token_id),
         ExecuteMsg::BurnBatch { tokens } => execute_burn_batch(env, deps, info, tokens),
+        ExecuteMsg::RemoteBurnBatch { owner, tokens } => execute_remote_burn_batch(env, deps, info, tokens, owner),
         ExecuteMsg::Store(store_msg) => execute_store(deps, info, store_msg),
         ExecuteMsg::StoreBatch(store_msg) => execute_store_batch(deps, info, store_msg),
         ExecuteMsg::StoreConf(msg) => execute_store_conf(deps, info, msg),
