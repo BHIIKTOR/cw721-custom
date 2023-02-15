@@ -1,11 +1,7 @@
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
+use cosmwasm_schema::cw_serde;
 // use crate::error::ContractError;
 use cw_storage_plus::{Item, Map};
-// use cw_storage_plus::{Item};
-// use cosmwasm_std::{Empty, Uint128, StdResult, StdError};
-// use cosmwasm_std::{Empty, Uint128, Storage};
-use cosmwasm_std::{Addr, Empty, Uint128, Timestamp};
+use cosmwasm_std::{Addr, Empty, Uint128};
 
 pub type Extension = Option<Metadata>;
 pub type CW721Contract<'a> = cw721_base::Cw721Contract<'a, Extension, Empty>;
@@ -17,27 +13,25 @@ pub const BURNT_AMOUNT: Map<&Addr, Uint128> = Map::new("burnt_amount");
 pub const BURNT_LIST: Map<&Addr, Vec<String>> = Map::new("burnt_list");
 
 // use cw_utils::{Expiration, Scheduled};
-use crate::msg::StoreConf;
+use crate::{msg::StoreConf, mint};
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+#[cw_serde]
 pub struct Config {
+    pub admin: String,
     pub name: String,
     pub token_supply: Uint128,
     pub token_total: Uint128,
-    pub cost_denom: String,
-    pub cost_amount: Uint128,
-    pub start_mint: Option<Timestamp>,
-    pub end_mint: Option<Timestamp>,
+    pub cost: mint::Costs,
+    pub dates: mint::Dates,
     pub max_mint_batch: Option<Uint128>,
-    pub owners_can_burn: bool,
-    pub minter_can_burn: bool,
-    pub funds_wallet: String,
-    pub store_conf: Option<StoreConf>,
+    pub burn: mint::Burn,
+    pub wallet: mint::Wallet,
+    pub store_conf: StoreConf,
     pub frozen: bool,
     pub paused: bool,
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, JsonSchema, Debug, Default)]
+#[cw_serde]
 pub struct Trait {
     pub display_type: Option<String>,
     pub trait_type: String,
@@ -45,7 +39,7 @@ pub struct Trait {
 }
 
 // see: https://docs.opensea.io/docs/metadata-standards
-#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, JsonSchema, Debug, Default)]
+#[cw_serde]
 pub struct Metadata {
     pub image: Option<String>,
     pub image_data: Option<String>,

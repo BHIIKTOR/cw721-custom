@@ -1,8 +1,9 @@
-// use cosmwasm_schema::cw_serde;
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
+use cosmwasm_schema::cw_serde;
 
-use cosmwasm_std::{Addr, Binary, Uint128, Timestamp};
+use cw721::Expiration;
+
+use cosmwasm_std::{Addr, Binary, Uint128};
+
 use cw721_base::{
     msg::{
         ExecuteMsg as CW721ExecuteMsg,
@@ -12,42 +13,31 @@ use cw721_base::{
     MintMsg as CW721MintMsg,
 };
 
-use crate::state::{Extension};
+use crate::{
+    state::Extension,
+    mint,
+};
 
 pub type MintMsg = CW721MintMsg<Extension>;
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct BatchStoreMsg {
     // pub batch: [CW721MintMsg<Extension>; 50],
     pub batch: Vec<CW721MintMsg<Extension>>
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct TransferOperation {
     pub recipient: String,
     pub tokens: Vec<String>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+#[cw_serde]
 pub struct MintBatchMsg {
-    // pub batch: [CW721MintMsg<Extension>; 50],
-    pub amount: Uint128
-}
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
-pub struct RemoteMintBatchMsg {
-    pub owner: String,
     pub amount: Uint128
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
-pub struct RemoteBurnBatchMsg {
-    pub owner: String,
-    pub tokens: Vec<String>,
-}
-
-use cw721::Expiration;
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+#[cw_serde]
 pub struct StoreConf {
     pub name: String,
     pub desc: String,
@@ -55,51 +45,54 @@ pub struct StoreConf {
     pub attributes: Vec<String>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+impl Default for StoreConf {
+    fn default() -> Self {
+        Self {
+            name: String::from("nft"),
+            desc: String::from("desc"),
+            ipfs: String::from("ipfs://"),
+            attributes: vec![],
+        }
+    }
+}
+
+#[cw_serde]
 pub struct StoreConfMsg {
     pub attributes: Vec<Vec<String>>,
     pub conf: Option<StoreConf>
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+#[cw_serde]
+#[derive(Default)]
 pub struct InstantiateMsg {
+    // defaults to this msg sender
+    pub admin: Option<String>,
+
     // Name of the NFT contract
     pub name: String,
 
-    // Symbol of the NFT contract
+    // symbol of the NFT
     pub symbol: String,
 
-    // minter
-    pub minter: String, // who can mint
+    // pub minter: String,
 
-    // if some start mint is used to start at a date
-    pub start_mint: Option<Timestamp>,
+    pub dates: mint::Dates,
 
-    // if some end mint is the limit of minting phase
-    pub end_mint: Option<Timestamp>,
+    pub cost: mint::Costs,
 
-    // name of the token
-    pub cost_denom: String,
-    // amount
-    pub cost_amount: Uint128,
+    pub burn: mint::Burn,
 
     // maximum token supply
     pub token_supply: Uint128,
 
     // wallet that recieves the funds
-    pub funds_wallet: String,
+    pub wallet: mint::Wallet,
 
     // defaults to 10
     pub max_mint_batch: Option<Uint128>,
 
-    // turn this ON to allow holders of the nft to burn their tokens
-    pub owners_can_burn: bool,
-
-    // turn this off to do not allow the contract owner to burn tokens
-    pub minter_can_burn: bool,
-
     // Used for StoreConf call but can be provided during the call
-    pub store_conf: Option<StoreConf>,
+    pub store_conf: StoreConf,
 }
 
 impl From<InstantiateMsg> for CW721InstantiateMsg {
@@ -107,14 +100,32 @@ impl From<InstantiateMsg> for CW721InstantiateMsg {
         CW721InstantiateMsg {
             name: msg.name,
             symbol: msg.symbol,
-            minter: msg.minter,
+            minter: msg.admin.unwrap(),
         }
     }
 }
 
+// impl Default for InstantiateMsg {
+//     fn default() -> Self {
+//         Self {
+//             admin: Default::default(),
+//             name: Default::default(),
+//             symbol: Default::default(),
+//             dates: Default::default(),
+//             cost: Default::default(),
+//             token_supply: Default::default(),
+//             wallet: Default::default(),
+//             max_mint_batch: Default::default(),
+//             burn: Default::default(),
+//             store_conf: Default::default()
+//         }
+//     }
+// }
+
 // Extended CW721 ExecuteMsg, added the ability to update, burn, and finalize nft
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
-#[serde(rename_all = "snake_case")]
+// #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+// #[serde(rename_all = "snake_case")]
+#[cw_serde]
 pub enum ExecuteMsg {
     // freeze contract
     Freeze(),
@@ -138,6 +149,7 @@ pub enum ExecuteMsg {
 
     // burn tokens in batch
     BurnBatch { tokens: Vec<String> },
+
     RemoteBurnBatch{ tokens: Vec<String>, owner: String },
 
     // Mint a new token, can only be called by the contract minter
@@ -145,6 +157,7 @@ pub enum ExecuteMsg {
 
     // mint using a max configurable amount per batch
     MintBatch(MintBatchMsg),
+
     RemoteMintBatch{ amount: Uint128, owner: String },
 
     // Store token metadata for later minting
@@ -220,8 +233,8 @@ impl From<ExecuteMsg> for CW721ExecuteMsg<Extension> {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[cw_serde]
+// #[derive(QueryResponses)]
 pub enum QueryMsg {
     // Returns the current contract config
     Config {},
@@ -284,9 +297,12 @@ impl From<QueryMsg> for CW721QueryMsg {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, JsonSchema, Debug)]
-#[serde(rename_all = "snake_case")]
-pub struct MigrateMsg<T> {
-    pub version: String,
-    pub config: Option<T>,
+// #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, JsonSchema, Debug)]
+// #[serde(rename_all = "snake_case")]
+#[cw_serde]
+pub enum MigrateMsg<T> {
+    WithConfig {
+        version: String,
+        config: Option<T>,
+    }
 }

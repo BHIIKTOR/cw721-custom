@@ -176,10 +176,10 @@ pub fn can_pay(
   }
 
   if let Some(coin) = info.funds.first() {
-      if coin.denom != config.cost_denom {
+      if coin.denom != config.cost.denom {
         Err(ContractError::WrongToken {})
       } else {
-          let total = config.cost_amount * amount;
+          let total = config.cost.amount * amount;
 
           if coin.amount < total {
               return Err(ContractError::NotEnoughFunds {})
@@ -236,14 +236,14 @@ pub fn can_mint(
   }
 
   // check if start_mint date is some and if is correct
-  if let Some(stamp) = &config.start_mint {
+  if let Some(stamp) = &config.dates.start {
     if time < stamp {
       return Err(ContractError::CantMintYet {})
     }
   }
 
   // check if end_mint date is some and if it has pass over the limit
-  if let Some(stamp) = &config.end_mint {
+  if let Some(stamp) = &config.dates.end {
     if time > stamp {
       return Err(ContractError::MintEnded {})
     }
@@ -277,7 +277,7 @@ pub fn check_token_ownership_basic(
 ) -> Result<TokenInfo<Option<Metadata>>, ContractError> {
   let token = contract.tokens.load(storage, token_id)?;
 
-  // owner can send
+  // owner can
   if token.owner == sender.clone() {
     Ok(token)
   } else {
@@ -293,7 +293,7 @@ pub fn check_token_ownership_approvals(
   if token
     .approvals
     .iter()
-    .any(|apr| apr.spender == sender.clone() && !apr.is_expired(&block))
+    .any(|apr| apr.spender == sender.clone() && !apr.is_expired(block))
   {
     Ok(())
   } else {
@@ -310,15 +310,15 @@ pub fn check_token_ownership_operators(
 ) -> Result<(), StdError> {
   let op = contract
     .operators
-    .may_load(storage, (&owner, &sender));
+    .may_load(storage, (owner, sender));
 
   if op.is_err() {
-    return Err(op.unwrap_err())
+    return Err(op.err().unwrap())
   }
 
   if op.is_ok() {
-    let ex = op.unwrap().unwrap();
-    if ex.is_expired(&block) {
+    let ex = op?;
+    if ex.unwrap().is_expired(block) {
       return Err(StdError::GenericErr { msg: "expired block".to_string() })
     }
   }
@@ -333,21 +333,21 @@ pub fn check_token_ownership_complete(
   sender: &Addr,
   token_id: &String,
 ) -> Result<TokenInfo<Option<Metadata>>, ContractError> {
-  let check_basic = check_token_ownership_basic(&contract, storage, &sender, &token_id);
+  let check_basic = check_token_ownership_basic(contract, storage, sender, token_id);
 
   // owner can send
   if check_basic.is_ok() {
-    return Ok(check_basic.unwrap())
+    return Ok(check_basic.ok().unwrap())
   }
 
   let token = check_basic.unwrap();
   // any non-expired token approval can send
-  if check_token_ownership_approvals(&token, &sender, &block).is_ok() {
+  if check_token_ownership_approvals(&token, sender, block).is_ok() {
     return Ok(token)
   }
 
   // operator can send
-  if check_token_ownership_operators(&contract, storage, &token.owner, sender, block).is_ok() {
+  if check_token_ownership_operators(contract, storage, &token.owner, sender, block).is_ok() {
     return Ok(token)
   }
 
@@ -362,7 +362,7 @@ pub fn transfer_nft(
   recipient: &Addr,
   token_id: &String,
 ) -> Result<String, ContractError> {
-  check_token_exists_or_err(contract, storage, &token_id)?;
+  check_token_exists_or_err(contract, storage, token_id)?;
 
   // ensure we have permissions
   let mut token = check_token_ownership_complete(contract, storage, &env.block, &info.sender, token_id)?;
@@ -383,7 +383,7 @@ pub fn update_total(
 ) -> Result<Uint128, ContractError> {
   let mut config = CONFIG.load(storage)?;
 
-  let total = config.token_total.checked_add(amount.clone());
+  let total = config.token_total.checked_add(*amount);
 
   if total.is_err() {
     return Err(ContractError::CantUpdateTotal {})

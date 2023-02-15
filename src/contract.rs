@@ -3,11 +3,10 @@ use cosmwasm_std::entry_point;
 
 use cosmwasm_std::{to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Uint128};
 
-use crate::execute_remote::{execute_remote_burn_batch, execute_remote_mint_batch};
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg };
 use crate::state::{Config, CW721Contract, CONFIG};
 
-use cw2::set_contract_version;
+use cw2::get_contract_version;
 
 pub use cw721_base::{
     MintMsg,
@@ -27,12 +26,13 @@ use crate::execute::{
     execute_store_batch,
     execute_store_conf,
     execute_pause,
-    execute_unpause, execute_unfreeze,
+    execute_unpause,
+    execute_unfreeze,
 };
 
 use crate::error::ContractError;
 
-use crate::migrate_function::try_migrate;
+use crate::migration::migrate_with_conf;
 
 use crate::query::{
     query_config,
@@ -43,8 +43,8 @@ use crate::query::{
 };
 
 // version info for migration info
-const CONTRACT_NAME: &str = "crates.io:cw721-offchain-randomization";
-const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
+pub const CONTRACT_NAME: &str = "crates.io:cw721-custom";
+// const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
@@ -54,24 +54,23 @@ pub fn instantiate(
     msg: InstantiateMsg,
 ) -> StdResult<Response> {
     let config = Config {
+        admin: msg.admin.unwrap_or_else(|| info.sender.to_string()),
         name: msg.name.clone(),
         token_supply: msg.token_supply,
-        token_total: Uint128::from(0u128),
-        cost_denom: msg.cost_denom,
-        cost_amount: msg.cost_amount,
-        start_mint: Some(msg.start_mint).unwrap_or_default(),
-        end_mint: Some(msg.end_mint).unwrap_or_default(),
+        token_total: Uint128::zero(),
+        cost: msg.cost,
+        dates: Some(msg.dates).unwrap_or_default(),
         max_mint_batch: Some(msg.max_mint_batch).unwrap_or_else(|| Some(Uint128::from(10u128))),
-        owners_can_burn: msg.owners_can_burn,
-        minter_can_burn: msg.minter_can_burn,
-        funds_wallet: msg.funds_wallet,
+        burn: msg.burn,
+        wallet: msg.wallet,
         store_conf: Some(msg.store_conf).unwrap(),
         frozen: false,
         paused: false,
     };
 
+    // this is usless because cw721 contract instantiate overwrites it
     // We use the set_contract_version function that we loaded above using cw2
-    set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+    // set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
     // We save the state to the database
     CONFIG.save(deps.storage, &config)?;
@@ -84,7 +83,7 @@ pub fn instantiate(
             CW721InitMsg {
                 name: msg.name,
                 symbol: msg.symbol,
-                minter: msg.minter
+                minter: config.admin
             }
     )
 }
@@ -99,19 +98,24 @@ pub fn execute(
     match msg {
         ExecuteMsg::Freeze{} => execute_freeze(deps, info),
         ExecuteMsg::Unfreeze{} => execute_unfreeze(deps, info),
+
         ExecuteMsg::Pause{} => execute_pause(deps, info),
         ExecuteMsg::Unpause{} => execute_unpause(deps, info),
+
         ExecuteMsg::Mint{} => execute_mint(env, deps, info),
         ExecuteMsg::MintBatch(mint_msg) => execute_mint_batch(env, deps, info, mint_msg),
-        ExecuteMsg::RemoteMintBatch { owner, amount } => execute_remote_mint_batch(env, deps, info, amount, owner),
+
         ExecuteMsg::Burn { token_id } => execute_burn(env, deps, info, token_id),
         ExecuteMsg::BurnBatch { tokens } => execute_burn_batch(env, deps, info, tokens),
-        ExecuteMsg::RemoteBurnBatch { owner, tokens } => execute_remote_burn_batch(env, deps, info, tokens, owner),
+
         ExecuteMsg::Store(store_msg) => execute_store(deps, info, store_msg),
         ExecuteMsg::StoreBatch(store_msg) => execute_store_batch(deps, info, store_msg),
         ExecuteMsg::StoreConf(msg) => execute_store_conf(deps, info, msg),
-        ExecuteMsg::UpdateConf(msg) => execute_update_conf(deps, info, msg),
+
         ExecuteMsg::TransferBatch(transfer) => execute_transfer_batch(env, deps, info, transfer),
+
+        ExecuteMsg::UpdateConf(msg) => execute_update_conf(deps, info, msg),
+
         // CW721 methods
         _ => CW721Contract::default()
             .execute(deps, env, info, msg.into())
@@ -140,11 +144,26 @@ pub fn query(
 pub fn migrate(
     deps: DepsMut,
     _env: Env,
-    msg: MigrateMsg<Config>,
+    msg: MigrateMsg<Option<Config>>,
 ) -> Result<Response, ContractError> {
-    let MigrateMsg { version, config } = msg;
-    try_migrate(deps, version, config)
-    // match msg {
-    //     MigrateMsg { version, config } => try_migrate(deps, version, config),
-    // }
+    match msg {
+        MigrateMsg::WithConfig { version, config } => {
+            if config.is_none() {
+                return Err(ContractError::MigrationConfNeeded {})
+            }
+
+            let current = get_contract_version(deps.storage)?;
+
+            if current.version != version.clone() {
+                let res = migrate_with_conf(deps, version.clone(), config.unwrap());
+
+                if res.is_ok() {
+                    return Ok(res.unwrap())
+                }
+            }
+
+            Err(ContractError::MigrationSameVersion { version })
+        },
+        _ => Err(ContractError::MigrationWrongStrategy {})
+    }
 }

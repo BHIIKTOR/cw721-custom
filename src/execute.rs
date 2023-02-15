@@ -115,19 +115,23 @@ pub fn execute_update_conf(
 ) -> Result<Response, ContractError> {
     can_update(&deps, &info)?;
 
+    let config = CONFIG.load(deps.storage)?;
+
+    if config.frozen {
+        return Err(ContractError::ContractFrozen {  })
+    }
+
     let config = Config {
+        admin: msg.admin.unwrap_or_else(|| info.sender.to_string()),
         name: msg.name,
         token_supply: msg.token_supply,
         token_total: Uint128::from(0u128),
-        cost_denom: msg.cost_denom,
-        cost_amount: msg.cost_amount,
-        start_mint: Some(msg.start_mint).unwrap_or_default(),
-        end_mint: Some(msg.end_mint).unwrap_or_default(),
+        cost: msg.cost,
+        dates: Some(msg.dates).unwrap_or_default(),
         max_mint_batch: Some(msg.max_mint_batch).unwrap_or_else(|| Some(Uint128::from(10u128))),
-        owners_can_burn: msg.owners_can_burn,
-        minter_can_burn: msg.minter_can_burn,
-        funds_wallet: msg.funds_wallet,
-        store_conf: Some(msg.store_conf).unwrap(),
+        burn: msg.burn,
+        wallet: msg.wallet,
+        store_conf: msg.store_conf,
         frozen: false,
         paused: false,
     };
@@ -155,12 +159,18 @@ pub fn execute_transfer_batch(
     let recipient_address = &deps.api.addr_validate(&transfer.recipient)?;
 
     for token_id in transfer.tokens {
-        match transfer_nft(deps.storage, &env, &cw721_contract, &info, recipient_address, &token_id) {
-            Ok(transfer_res) => {
-                results.push(format!("{}, {}", token_id, transfer_res))
-            },
+        match transfer_nft(
+            deps.storage,
+            &env,
+            &cw721_contract,
+            &info,
+            recipient_address,
+            &token_id
+        ) {
+            Ok(_) => results.push(token_id.to_string()),
             Err(e) => {
-                results.push(format!("{}, {}", token_id, e.to_string()))
+                let v = vec![token_id, e.to_string()];
+                results.push(v.join(", "))
             },
         }
     }
@@ -168,8 +178,9 @@ pub fn execute_transfer_batch(
     Ok(
         Response::new()
             .add_attribute("action", "transfer_batch")
-            .add_attribute("recipient", transfer.recipient.to_string())
-            .add_attribute("result", format!("[{}]", results.join(", ")))
+            .add_attribute("sender", info.sender)
+            .add_attribute("recipient", transfer.recipient)
+            .add_attribute("result", format!("{:?}", results))
     )
 }
 
@@ -183,7 +194,7 @@ pub fn execute_burn(
     let config = CONFIG.load(deps.storage)?;
     let minter = cw721_contract.minter.load(deps.storage).unwrap();
 
-    if config.owners_can_burn {
+    if config.burn.owners {
         let token = cw721_contract.tokens.load(deps.storage, &token_id)?;
 
         if token.owner == minter || token.owner != info.sender {
@@ -205,30 +216,37 @@ pub fn execute_burn(
             .add_attribute("token_id", token_id))
     }
 
-    if config.minter_can_burn {
-        // validate sender permissions
-        can_update(&deps, &info)?;
+    // TODO:: Validate config.burn.admin properly
+    if config.burn.admin.is_some() {
+        let admin = config.burn.admin.unwrap();
 
-        burn_and_update(
-            &cw721_contract,
-            deps.storage,
-            &token_id,
-            &info.sender,
-            &env.block,
-            true
-        )?;
+        if admin == info.sender {
+            // validate sender permissions
+            can_update(&deps, &info)?;
 
-        return Ok(Response::new()
-            .add_attribute("action", "burn")
-            .add_attribute("sub", "minter_burn")
-            .add_attribute("token_id", token_id))
+            let check_owner: bool = !config.burn.can_burn_owned;
+
+            burn_and_update(
+                &cw721_contract,
+                deps.storage,
+                &token_id,
+                &info.sender,
+                &env.block,
+                check_owner
+            )?;
+
+            return Ok(Response::new()
+                .add_attribute("action", "burn")
+                .add_attribute("sub", "admin_burn")
+                .add_attribute("token_id", token_id))
+        }
     }
 
     Ok(Response::new()
         .add_attribute("action", "burn_nothing")
         .add_attribute("why", "configuration")
-        .add_attribute("owners_can_burn", config.owners_can_burn.to_string())
-        .add_attribute("minter_can_burn", config.minter_can_burn.to_string())
+        .add_attribute("owners_can_burn", config.burn.owners.to_string())
+        .add_attribute("admin_can_burn", "true")
     )
 }
 
@@ -277,14 +295,14 @@ pub fn execute_burn_batch(
         burn_and_update(
             &cw721_contract,
             storage,
-            &token_id,
+            token_id,
             &info.sender,
             &env.block,
             check_owner
         )
     };
 
-    if config.owners_can_burn {
+    if config.burn.owners {
         for token_id in tokens {
             let token = cw721_contract.tokens.load(deps.storage, &token_id)?;
 
@@ -300,7 +318,7 @@ pub fn execute_burn_batch(
         response = Response::new()
             .add_attribute("action", "burn_batch")
             .add_attribute("sub", "owner_burn");
-    } else if config.minter_can_burn {
+    } else if config.burn.admin.is_some() {
         // validate sender permissions
         can_update(&deps, &info)?;
 
@@ -318,21 +336,21 @@ pub fn execute_burn_batch(
         response = Response::new()
             .add_attribute("action", "burn_nothing")
             .add_attribute("why", "configuration")
-            .add_attribute("owners_can_burn", config.owners_can_burn.to_string())
-            .add_attribute("minter_can_burn", config.minter_can_burn.to_string());
+            .add_attribute("owners_can_burn", config.burn.owners.to_string())
+            .add_attribute("admin_can_burn", "true");
     }
 
     if response.attributes[0].value != "burn_nothing" {
         if !burnt_tokens.is_empty() {
-            response = response.add_attribute("burnt_tokens", format!("[{}]", burnt_tokens.join(",")));
+            response = response.add_attribute("burnt_tokens", format!("{:?}", burnt_tokens));
         }
 
         if !not_burnt_tokens.is_empty() {
-            response = response.add_attribute("not_burnt", format!("[{}]", not_burnt_tokens.join(",")));
+            response = response.add_attribute("not_burnt", format!("{:?}", not_burnt_tokens));
         }
 
         if !errors.is_empty() {
-            response = response.add_attribute("errors", format!("[{}]", errors.join(",")));
+            response = response.add_attribute("errors", format!("{:?}", errors));
         }
     }
 
@@ -379,7 +397,7 @@ pub fn execute_mint(
         .add_attribute("token_id", current_count.to_string())
         .add_message(
             CosmosMsg::Bank(BankMsg::Send {
-                to_address: config.funds_wallet,
+                to_address: config.wallet.wallet.to_string(),
                 amount: vec![coin_found],
             })
         )
@@ -449,20 +467,20 @@ pub fn execute_mint_batch(
         }
     }
 
-    coin_found.amount = config.cost_amount * Uint128::from(total_minted);
+    coin_found.amount = config.cost.amount * Uint128::from(total_minted);
 
     response_msg = response_msg.add_attribute("minted", total_minted.to_string())
         .add_attribute("cost", coin_found.amount.to_string())
-        .add_attribute("list", format!("[{}]", ids.join(",")));
+        .add_attribute("list", format!("{:?}", ids));
 
     if !errors.is_empty() {
-        response_msg = response_msg.add_attribute("errors", format!("[{}]", errors.join(",")));
+        response_msg = response_msg.add_attribute("errors", format!("{:?}", errors));
     }
 
     // send funds to the configured funds wallet
     response_msg = response_msg.add_message(
         CosmosMsg::Bank(BankMsg::Send {
-            to_address: config.funds_wallet,
+            to_address: config.wallet.wallet.into_string(),
             amount: vec![coin_found],
         })
     );
@@ -530,13 +548,7 @@ pub fn execute_store_conf(
     let minter = cw721_contract.minter.load(deps.storage)?;
     let conf = CONFIG.load(deps.storage)?;
 
-    // check if we have store_conf from any of this two sources
-    // first the states CONFIG and second the StoreConfMsg in the TX
-    if conf.store_conf.is_none() && msg.conf.is_none() {
-        return Err(ContractError::NoConfiguration {})
-    }
-
-    let mut store_conf = conf.store_conf.unwrap();
+    let mut store_conf = conf.store_conf;
 
     // overwrite the original if we have data in the msg
     if msg.conf.is_some() {

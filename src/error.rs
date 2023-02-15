@@ -96,8 +96,14 @@ pub enum ContractError {
     #[error["Failed to update total tokens"]]
     CantUpdateTotal {},
 
-    #[error("Error {error}")]
-    DelegateError { error: StdError },
+    #[error["Migration failed, same version: {version}"]]
+    MigrationSameVersion { version : String },
+
+    #[error["Migration failed, wrong strategy"]]
+    MigrationWrongStrategy { },
+
+    #[error["Migration failed, no configuration"]]
+    MigrationConfNeeded { }
 }
 
 impl From<CW721ContractError> for ContractError {

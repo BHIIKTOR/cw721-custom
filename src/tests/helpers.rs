@@ -1,25 +1,28 @@
 #[cfg(test)]
 pub mod tests_helpers {
+
   use cosmwasm_std::{
     Uint128,
-    Timestamp,
+    Timestamp, Addr,
   };
 
   use cw721_base::MintMsg;
 
-  use crate::msg::{
-    InstantiateMsg,
-    BatchStoreMsg,
+  use crate::{
+    mint,
+    msg::{
+      InstantiateMsg,
+      BatchStoreMsg,
+    }
   };
 
   use crate::state::Extension;
 
   const ADMIN: &str = "admin";
-  // const MINTER: &str = "minter";
 
   const FUNDWALLET: &str = "wallet";
 
-  const DENOM: &str = "uluna";
+  const DENOM: &str = "ujuno";
   const SUPPLY: u128 = 20u128;
   const COST: u128 = 4000000u128;
 
@@ -43,23 +46,31 @@ pub mod tests_helpers {
       end_mint: u64,
   ) -> InstantiateMsg {
       InstantiateMsg {
-          name: "nftt".to_string(),
-          symbol: "NFTT".to_string(),
-          minter: ADMIN.to_string(),
-          funds_wallet: FUNDWALLET.to_string(),
+          name: "nft".to_string(),
+          symbol: "NFT".to_string(),
+          admin: Some(ADMIN.to_string()),
+          wallet: mint::Wallet { name: "admin".to_string(), wallet: Addr::unchecked(FUNDWALLET.to_string()) },
           token_supply: Uint128::from(SUPPLY),
-          cost_denom: DENOM.to_string(),
-          cost_amount: Uint128::from(COST),
           max_mint_batch: None,
-          owners_can_burn: false,
-          minter_can_burn: true,
-          start_mint: Some(Timestamp::from_seconds(star_mint)),
-          end_mint: Some(Timestamp::from_seconds(0).plus_seconds(end_mint)),
-          store_conf: None,
+          cost: mint::Costs {
+            denom: DENOM.to_string(),
+            amount: Uint128::from(COST),
+          },
+          dates: mint::Dates {
+            start: Some(Timestamp::from_seconds(star_mint)),
+            end: Some(Timestamp::from_seconds(0).plus_seconds(end_mint))
+          },
+          burn: mint::Burn {
+            owners: true,
+            admin: None,
+            can_burn_owned: false,
+          },
+          store_conf: Default::default(),
       }
   }
 
-  pub fn get_store_batch_msg () -> BatchStoreMsg {
+  pub fn get_store_batch_msg (
+  ) -> BatchStoreMsg {
       let mut batch: Vec<MintMsg<Extension>> = vec![];
       let num: usize = 20;
 

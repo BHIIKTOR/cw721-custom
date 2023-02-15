@@ -34,17 +34,15 @@ pub struct InstantiateMsg {
     // Name of the NFT contract
     pub name: String,
 
-    // Symbol of the NFT contract
     pub symbol: String,
 
-    // minter
-    pub minter: String, // who can mint, passed to the CW721 base contract
+    pub minter: String,
 
-    // when the minting can start?
-    pub start_mint: Option<Timestamp>,
+    pub dates: mint::Dates,
 
-    pub cost_denom: String, // name of the token
-    pub cost_amount: Uint128, // amount
+    pub cost: mint::Costs,
+
+    pub burn: mint::Burn,
 
     // maximum token supply
     pub token_supply: Uint128,
@@ -52,34 +50,11 @@ pub struct InstantiateMsg {
     // wallet that recieves the funds
     pub funds_wallet: String,
 
-    /// max size of minting batch
-    pub max_mint_batch: Uint128,
+    // defaults to 10
+    pub max_mint_batch: Option<Uint128>,
 
-    // turn this ON to allow holders of the nft to burn their tokens
-    pub owners_can_burn: bool,
-
-    // turn this off to do not allow the contract owner to burn tokens
-    pub minter_can_burn: bool,
-
+    // Used for StoreConf call but can be provided during the call
     pub store_conf: Option<StoreConf>,
-}
-```
-
-### InitMsg JSON example
-
-```JSON
-{
-  "name": "",
-  "symbol": "",
-  "minter": "",
-  "cost_denom": "uluna",
-  "cost_amount": "5000000",
-  "token_supply": "100000",
-  "start_mint": "1667925343853",
-  "max_mint_batch": "10",
-  "owners_can_burn": true,
-  "minter_can_burn": false,
-  "funds_wallet": ""
 }
 ```
 
