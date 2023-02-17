@@ -1,7 +1,8 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 
-use cosmwasm_std::{to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Uint128};
+use cosmwasm_std::{to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Uint128, Order};
+// use cw721::Cw721Query;
 
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg };
 use crate::state::{Config, CW721Contract, CONFIG};
@@ -154,11 +155,29 @@ pub fn migrate(
 
             let current = get_contract_version(deps.storage)?;
 
-            if current.version != version.clone() {
-                let res = migrate_with_conf(deps, version.clone(), config.unwrap());
+            if current.version != version {
+                let cw721_contract = CW721Contract::default();
+
+                cw721_contract
+                    .tokens
+                    .keys(deps.storage, None, None, Order::Ascending)
+                    .collect::<StdResult<Vec<String>>>()
+                    .unwrap()
+                    .into_iter()
+                    .try_for_each(|token| {
+                        let res = cw721_contract.tokens.remove(deps.storage, &token);
+
+                        if res.is_err() {
+                            return Err(ContractError::MigrationFailedDuringStateClear { msg: res.err().unwrap().to_string() });
+                        }
+
+                        Ok(())
+                    })?;
+
+                let res = migrate_with_conf(deps.storage, version.clone(), config.unwrap());
 
                 if res.is_ok() {
-                    return Ok(res.unwrap())
+                    return Ok(Response::default())
                 }
             }
 

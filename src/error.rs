@@ -103,7 +103,10 @@ pub enum ContractError {
     MigrationWrongStrategy { },
 
     #[error["Migration failed, no configuration"]]
-    MigrationConfNeeded { }
+    MigrationConfNeeded { },
+
+    #[error("Migration failed, During state clear {msg}")]
+    MigrationFailedDuringStateClear { msg: String },
 }
 
 impl From<CW721ContractError> for ContractError {

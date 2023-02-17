@@ -1,27 +1,27 @@
-use cosmwasm_std::{DepsMut, Response};
+use cosmwasm_std::{Response, Storage};
 
 use crate::contract::CONTRACT_NAME;
-// From the cw2 crate we're loading the following:
+
 use crate::error::ContractError;
 use crate::state::{Config, CONFIG};
+
+// From the cw2 crate we're loading the following:
 use cw2::{get_contract_version, set_contract_version};
 
 pub fn migrate_with_conf(
-    deps: DepsMut,
+    storage: &mut dyn Storage,
     version: String,
     config: Option<Config>,
 ) -> Result<Response, ContractError> {
-    let contract_version = get_contract_version(deps.storage)?;
+    let contract_version = get_contract_version(storage)?;
     let config = config.unwrap();
 
-    let old_name = contract_version.contract.clone();
-    let old_version = contract_version.version.clone();
+    let old_name = contract_version.contract;
+    let old_version = contract_version.version;
 
-    set_contract_version(deps.storage, CONTRACT_NAME, version.clone())?;
+    set_contract_version(storage, CONTRACT_NAME, version.clone())?;
 
-    CONFIG.save(deps.storage, &config)?;
-
-    // TODO: Whipe all old state data
+    CONFIG.save(storage, &config)?;
 
     Ok(Response::new()
         .add_attribute("method", "migration")
