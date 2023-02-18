@@ -99,5 +99,62 @@ mod general {
 
         assert_eq!(res.attributes[0].value, "freeze");
     }
+
+    #[test]
+    fn unfreeze() {
+        let mut deps = mock_dependencies();
+        let info = mock_info(ADMIN, &[]);
+
+        instantiate(deps.as_mut(), mock_env(), info.clone(), get_init_msg(0, 900)).unwrap();
+
+        let msg = ExecuteMsg::Unfreeze();
+
+        let res: Response = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
+
+        assert_eq!(res.attributes[0].value, "unfreeze");
+    }
 }
 
+// #[cfg(test)]
+// mod breaking {
+//     use cosmwasm_std::{
+//         Uint128,
+//         Response,
+//     };
+
+//     use cosmwasm_std::testing::{
+//         mock_dependencies,
+//         mock_env,
+//         mock_info,
+//     };
+
+//     use crate::mint;
+//     use crate::{
+//         contract::{
+//             execute,
+//             instantiate
+//         },
+//         msg::{
+//             ExecuteMsg
+//         },
+//         tests::helpers::tests_helpers::{
+//             get_init_msg,
+//         }
+//     };
+
+//     const ADMIN: &str = "admin";
+
+//     #[test]
+//     fn init_contract() {
+//         let mut deps = mock_dependencies();
+//         let info = mock_info(ADMIN, &[]);
+//         let mut msg = get_init_msg(0, 900);
+
+//         msg.burn.admin = Some(ADMIN.to_string());
+//         msg.burn.owners = true;
+
+//         msg.burn.both_can_burn = Some(true);
+
+//         instantiate(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
+//     }
+// }

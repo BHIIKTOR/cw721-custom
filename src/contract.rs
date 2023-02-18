@@ -1,9 +1,10 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 
-use cosmwasm_std::{to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Uint128, Order};
+use cosmwasm_std::{to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Uint128, StdError};
 // use cw721::Cw721Query;
 
+use crate::helpers::clear_state;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg };
 use crate::state::{Config, CW721Contract, CONFIG};
 
@@ -68,6 +69,12 @@ pub fn instantiate(
         frozen: false,
         paused: false,
     };
+
+    if config.burn.both_can_burn.unwrap() && config.burn.admin.is_none() || !config.burn.owners {
+        return Err(StdError::GenericErr {
+            msg: "both can burn is on, but admin and owners are not configured".to_string()
+        })
+    }
 
     // this is usless because cw721 contract instantiate overwrites it
     // We use the set_contract_version function that we loaded above using cw2
@@ -156,28 +163,39 @@ pub fn migrate(
             let current = get_contract_version(deps.storage)?;
 
             if current.version != version {
+                let res = migrate_with_conf(deps.storage, version.clone(), config.unwrap());
+
+                if res.is_ok() {
+                    return Ok(
+                        Response::default()
+                            .add_attribute("action", "migration")
+                    )
+                }
+            }
+
+            Err(ContractError::MigrationSameVersion { version })
+        },
+        MigrateMsg::WithConfigClearState { version, config } => {
+            if config.is_none() {
+                return Err(ContractError::MigrationConfNeeded {})
+            }
+
+            let current = get_contract_version(deps.storage)?;
+
+            if current.version != version {
                 let cw721_contract = CW721Contract::default();
 
-                cw721_contract
-                    .tokens
-                    .keys(deps.storage, None, None, Order::Ascending)
-                    .collect::<StdResult<Vec<String>>>()
-                    .unwrap()
-                    .into_iter()
-                    .try_for_each(|token| {
-                        let res = cw721_contract.tokens.remove(deps.storage, &token);
+                clear_state(deps.storage)?;
 
-                        if res.is_err() {
-                            return Err(ContractError::MigrationFailedDuringStateClear { msg: res.err().unwrap().to_string() });
-                        }
-
-                        Ok(())
-                    })?;
+                cw721_contract.tokens.clear(deps.storage);
 
                 let res = migrate_with_conf(deps.storage, version.clone(), config.unwrap());
 
                 if res.is_ok() {
-                    return Ok(Response::default())
+                    return Ok(
+                        Response::default()
+                            .add_attribute("action", "migration")
+                    )
                 }
             }
 

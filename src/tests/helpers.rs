@@ -64,6 +64,7 @@ pub mod tests_helpers {
             owners: true,
             admin: None,
             can_burn_owned: false,
+            both_can_burn: Some(false),
           },
           store_conf: Default::default(),
       }

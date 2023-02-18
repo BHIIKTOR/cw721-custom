@@ -2,7 +2,7 @@ use cosmwasm_schema::cw_serde;
 
 use cw721::Expiration;
 
-use cosmwasm_std::{Addr, Binary, Uint128};
+use cosmwasm_std::{Addr, Binary, Uint128, Empty};
 
 use cw721_base::{
     msg::{
@@ -105,26 +105,6 @@ impl From<InstantiateMsg> for CW721InstantiateMsg {
     }
 }
 
-// impl Default for InstantiateMsg {
-//     fn default() -> Self {
-//         Self {
-//             admin: Default::default(),
-//             name: Default::default(),
-//             symbol: Default::default(),
-//             dates: Default::default(),
-//             cost: Default::default(),
-//             token_supply: Default::default(),
-//             wallet: Default::default(),
-//             max_mint_batch: Default::default(),
-//             burn: Default::default(),
-//             store_conf: Default::default()
-//         }
-//     }
-// }
-
-// Extended CW721 ExecuteMsg, added the ability to update, burn, and finalize nft
-// #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
-// #[serde(rename_all = "snake_case")]
 #[cw_serde]
 pub enum ExecuteMsg {
     // freeze contract
@@ -219,8 +199,8 @@ pub enum ExecuteMsg {
     },
 }
 
-impl From<ExecuteMsg> for CW721ExecuteMsg<Extension> {
-    fn from(msg: ExecuteMsg) -> CW721ExecuteMsg<Extension> {
+impl From<ExecuteMsg> for CW721ExecuteMsg<Extension, Empty> {
+    fn from(msg: ExecuteMsg) -> CW721ExecuteMsg<Extension, Empty> {
         match msg {
             ExecuteMsg::TransferNft { recipient, token_id, } => CW721ExecuteMsg::TransferNft { recipient, token_id, },
             ExecuteMsg::SendNft { contract, token_id, msg, } => CW721ExecuteMsg::SendNft { contract, token_id, msg, },
@@ -282,8 +262,8 @@ pub enum QueryMsg {
     },
 }
 
-impl From<QueryMsg> for CW721QueryMsg {
-    fn from(msg: QueryMsg) -> CW721QueryMsg {
+impl From<QueryMsg> for CW721QueryMsg<Empty> {
+    fn from(msg: QueryMsg) -> CW721QueryMsg<Empty> {
         match msg {
             QueryMsg::OwnerOf { token_id, include_expired, } => CW721QueryMsg::OwnerOf { token_id, include_expired, },
             QueryMsg::NumTokens {} => CW721QueryMsg::NumTokens {},
@@ -301,6 +281,10 @@ impl From<QueryMsg> for CW721QueryMsg {
 // #[serde(rename_all = "snake_case")]
 #[cw_serde]
 pub enum MigrateMsg<T> {
+    WithConfigClearState {
+        version: String,
+        config: Option<T>,
+    },
     WithConfig {
         version: String,
         config: Option<T>,

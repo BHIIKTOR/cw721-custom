@@ -29,6 +29,25 @@ use crate::{
   }
 };
 
+pub fn clear_state(
+  storage: &mut dyn Storage,
+) -> Result<(), ContractError> {
+  let mut state_config = CONFIG.load(storage)?;
+
+  state_config.token_supply = Uint128::zero();
+  state_config.token_total = Uint128::zero();
+  state_config.paused = true;
+  state_config.frozen = true;
+
+  BURNT_LIST.clear(storage);
+  BURNT_AMOUNT.clear(storage);
+  BURNED.clear(storage);
+
+  CONFIG.save(storage, &state_config)?;
+
+  Ok(())
+}
+
 // Check if sender is the configured contract owner or minter so they can update data
 pub fn can_update(
   deps: &DepsMut,
@@ -52,12 +71,12 @@ pub fn update_burnt_amount(
 ) -> Result<(), ContractError> {
   match BURNT_AMOUNT.load(storage, sender) {
     Ok(mut amount) => {
-        amount += Uint128::from(1u32);
+        amount += Uint128::one();
         BURNT_AMOUNT.save(storage, sender, &amount)?;
         Ok(())
     },
     Err(_) => {
-        BURNT_AMOUNT.save(storage, sender, &Uint128::from(1u32))?;
+        BURNT_AMOUNT.save(storage, sender, &Uint128::one())?;
         Ok(())
     }
   }
@@ -97,14 +116,15 @@ pub fn check_token_exists_or_err(
 pub fn burn_token(
   contract: &CW721Contract,
   storage: &mut dyn Storage,
+  token: &TokenInfo<Option<Metadata>>,
   token_id: &String,
   sender: &Addr,
   check_owner: bool
 ) -> Result<(), ContractError> {
-  check_token_exists_or_err(contract, storage, token_id)?;
+  // check_token_exists_or_err(contract, storage, token_id)?;
 
   if check_owner {
-    check_token_ownership_basic(contract, storage, sender, token_id)?;
+    check_token_ownership_basic(sender, token)?;
   }
 
   contract.tokens.remove(storage, token_id)?;
@@ -120,12 +140,13 @@ pub fn burn_token(
 pub fn burn_and_update(
   contract: &CW721Contract,
   storage: &mut dyn Storage,
+  token: &TokenInfo<Option<Metadata>>,
   token_id: &String,
   sender: &Addr,
   _block: &BlockInfo,
   check_owner: bool
 ) -> Result<(), ContractError> {
-  burn_token(contract, storage, token_id, sender, check_owner)?;
+  burn_token(contract, storage, token, token_id, sender, check_owner)?;
 
   update_burnt_amount(storage, sender)?;
 
@@ -270,16 +291,12 @@ pub fn can_mint(
 }
 
 pub fn check_token_ownership_basic(
-  contract: &CW721Contract,
-  storage: &mut dyn Storage,
   sender: &Addr,
-  token_id: &String,
+  token: &TokenInfo<Option<Metadata>>,
 ) -> Result<TokenInfo<Option<Metadata>>, ContractError> {
-  let token = contract.tokens.load(storage, token_id)?;
-
-  // owner can
+  // sender is owner
   if token.owner == sender.clone() {
-    Ok(token)
+    Ok(token.clone())
   } else {
     Err(ContractError::Unauthorized {})
   }
@@ -331,9 +348,9 @@ pub fn check_token_ownership_complete(
   storage: &mut dyn Storage,
   block: &BlockInfo,
   sender: &Addr,
-  token_id: &String,
+  token: &TokenInfo<Option<Metadata>>
 ) -> Result<TokenInfo<Option<Metadata>>, ContractError> {
-  let check_basic = check_token_ownership_basic(contract, storage, sender, token_id);
+  let check_basic = check_token_ownership_basic(sender, token);
 
   // owner can send
   if check_basic.is_ok() {
@@ -360,12 +377,13 @@ pub fn transfer_nft(
   contract: &CW721Contract,
   info: &MessageInfo,
   recipient: &Addr,
+  token: &TokenInfo<Option<Metadata>>,
   token_id: &String,
 ) -> Result<String, ContractError> {
   check_token_exists_or_err(contract, storage, token_id)?;
 
   // ensure we have permissions
-  let mut token = check_token_ownership_complete(contract, storage, &env.block, &info.sender, token_id)?;
+  let mut token = check_token_ownership_complete(contract, storage, &env.block, &info.sender, token)?;
 
   // set owner and remove existing approvals
   token.owner = recipient.clone();

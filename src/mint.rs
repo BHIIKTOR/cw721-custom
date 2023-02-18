@@ -55,10 +55,15 @@ pub struct Dates {
 pub struct Burn {
   // peoplo who whold the tokens
   pub owners: bool,
+
   // the admin of the contract
   pub admin: Option<String>,
+
   // admin can burn owned
   pub can_burn_owned: bool,
+
+  // allow admin and owners to burn
+  pub both_can_burn: Option<bool>
 }
 
 // impl Default for Burn {

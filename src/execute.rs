@@ -125,7 +125,7 @@ pub fn execute_update_conf(
         admin: msg.admin.unwrap_or_else(|| info.sender.to_string()),
         name: msg.name,
         token_supply: msg.token_supply,
-        token_total: Uint128::from(0u128),
+        token_total: Uint128::zero(),
         cost: msg.cost,
         dates: Some(msg.dates).unwrap_or_default(),
         max_mint_batch: Some(msg.max_mint_batch).unwrap_or_else(|| Some(Uint128::from(10u128))),
@@ -159,12 +159,15 @@ pub fn execute_transfer_batch(
     let recipient_address = &deps.api.addr_validate(&transfer.recipient)?;
 
     for token_id in transfer.tokens {
+        let token = cw721_contract.tokens.load(deps.storage, &token_id)?;
+
         match transfer_nft(
             deps.storage,
             &env,
             &cw721_contract,
             &info,
             recipient_address,
+            &token,
             &token_id
         ) {
             Ok(_) => results.push(token_id.to_string()),
@@ -194,16 +197,20 @@ pub fn execute_burn(
     let config = CONFIG.load(deps.storage)?;
     let minter = cw721_contract.minter.load(deps.storage).unwrap();
 
-    if config.burn.owners {
-        let token = cw721_contract.tokens.load(deps.storage, &token_id)?;
+    let token: TokenInfo<Option<Metadata>> = cw721_contract.tokens.load(deps.storage, &token_id)?;
 
+    if config.burn.owners {
         if token.owner == minter || token.owner != info.sender {
-            return Err(ContractError::Unauthorized {})
+            return Err(ContractError::UnauthorizedWithMsg {
+                msg: "sender is not owner".to_string(),
+                sender: info.sender.to_string()
+            })
         }
 
         burn_and_update(
             &cw721_contract,
             deps.storage,
+            &token,
             &token_id,
             &info.sender,
             &env.block,
@@ -216,7 +223,6 @@ pub fn execute_burn(
             .add_attribute("token_id", token_id))
     }
 
-    // TODO:: Validate config.burn.admin properly
     if config.burn.admin.is_some() {
         let admin = config.burn.admin.unwrap();
 
@@ -229,6 +235,7 @@ pub fn execute_burn(
             burn_and_update(
                 &cw721_contract,
                 deps.storage,
+                &token,
                 &token_id,
                 &info.sender,
                 &env.block,
@@ -292,9 +299,12 @@ pub fn execute_burn_batch(
         token_id: &String,
         check_owner: bool
     | -> Result<(), ContractError> {
+        let token = cw721_contract.tokens.load(storage, token_id.as_str())?;
+
         burn_and_update(
             &cw721_contract,
             storage,
+            &token,
             token_id,
             &info.sender,
             &env.block,
@@ -304,10 +314,15 @@ pub fn execute_burn_batch(
 
     if config.burn.owners {
         for token_id in tokens {
-            let token = cw721_contract.tokens.load(deps.storage, &token_id)?;
+            let token = cw721_contract.tokens.load(deps.storage, token_id.as_str())?;
 
             if token.owner == minter || token.owner != info.sender {
-                handle_error(&token_id, true, Some(ContractError::Unauthorized {}))
+                let e = ContractError::UnauthorizedWithMsg {
+                    msg: "sender is not owner".to_string(),
+                    sender: info.sender.to_string()
+                };
+
+                handle_error(&token_id, true, Some(e))
             } else {
                 let op_res = run_op(deps.storage, &token_id, true);
 
@@ -366,7 +381,7 @@ pub fn execute_mint(
     let config = CONFIG.load(deps.storage)?;
     let minter = cw721_contract.minter.load(deps.storage)?;
     let current_count = cw721_contract.token_count(deps.storage)?;
-    let mint_amount = Uint128::from(1u32);
+    let mint_amount = Uint128::one();
 
     // check if we can mint
     let current_token_id = can_mint(
@@ -457,7 +472,7 @@ pub fn execute_mint_batch(
         // push token id to the ids list
         if res.is_ok() {
             total_minted += 1;
-            current_token_id += Uint128::from(1u32);
+            current_token_id += Uint128::one();
             ids.push(current_token_id.to_string())
         }
 
@@ -501,7 +516,7 @@ pub fn execute_store(
 
     try_store(deps.storage, &nft_data, &minter, &cw721_contract)?;
 
-    let total = CONFIG.load(deps.storage)?.token_total + Uint128::from(1u8);
+    let total = CONFIG.load(deps.storage)?.token_total + Uint128::one();
     update_total(deps.storage, &total)?;
 
     Ok(Response::new()
@@ -591,7 +606,7 @@ pub fn execute_store_conf(
 
         cw721_contract.tokens.save(deps.storage, &total.to_string(), &token)?;
 
-        total += Uint128::from(1u8)
+        total += Uint128::one()
     }
 
     total = update_total(deps.storage, &total)?;

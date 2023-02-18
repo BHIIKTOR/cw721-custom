@@ -11,6 +11,9 @@ pub enum ContractError {
     #[error("Unauthorized to execute request")]
     Unauthorized {},
 
+    #[error("Unauthorized to execute request: {msg} ({sender})")]
+    UnauthorizedWithMsg { msg: String, sender: String },
+
     #[error("Approval not found for: {spender}")]
     ApprovalNotFound { spender: String },
 
@@ -28,6 +31,9 @@ pub enum ContractError {
 
     #[error("Mint amount is zero")]
     MintZero {},
+
+    #[error("Burn configuration error: {msg}")]
+    BurnWrongConfiguration { msg: String },
 
     #[error("Mint amount is larger than allowed")]
     MintAmountLargerThanAllowed {},
@@ -60,7 +66,7 @@ pub enum ContractError {
     #[error("Amount of funds sends are not equal to the required total")]
     IncorrectFunds {},
 
-    #[error("Too many denoms were sent")]
+    #[error("Too many tokens varieties were sent")]
     TooManyDenoms {},
 
     //NoFundsSent

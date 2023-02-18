@@ -37,7 +37,7 @@ mod general {
     const ADMIN: &str = "admin";
 
     #[test]
-    fn migrate_with_conf() {
+    fn migrate_with_conf_and_clear_state() {
         let mut deps = mock_dependencies();
         let info = mock_info(ADMIN, &[]);
 
@@ -63,7 +63,7 @@ mod general {
             paused: false,
         };
 
-        let msg : MigrateMsg<Option<Config>> = MigrateMsg::WithConfig {
+        let msg : MigrateMsg<Option<Config>> = MigrateMsg::WithConfigClearState {
           version: String::from("2.0.0"),
           config: Some(Some(config))
         };

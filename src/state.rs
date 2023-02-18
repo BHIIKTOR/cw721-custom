@@ -4,7 +4,7 @@ use cw_storage_plus::{Item, Map};
 use cosmwasm_std::{Addr, Empty, Uint128};
 
 pub type Extension = Option<Metadata>;
-pub type CW721Contract<'a> = cw721_base::Cw721Contract<'a, Extension, Empty>;
+pub type CW721Contract<'a> = cw721_base::Cw721Contract<'a, Extension, Empty, Empty, Empty>;
 
 pub const CONFIG: Item<Config> = Item::new("config");
 
