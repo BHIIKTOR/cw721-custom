@@ -1,7 +1,10 @@
+pub mod test_helpers;
 pub mod helpers;
 pub mod contract;
 pub mod store;
 pub mod mint;
+pub mod pledge;
 pub mod burn;
 pub mod transfer;
 pub mod migration;
+pub mod query;

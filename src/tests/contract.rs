@@ -20,7 +20,7 @@ mod general {
         msg::{
             ExecuteMsg
         },
-        tests::helpers::tests_helpers::{
+        tests::test_helpers::tests_helpers::{
             get_init_msg,
         }
     };
@@ -40,7 +40,7 @@ mod general {
             mock_env(),
             info,
             ExecuteMsg::UpdateConf(crate::msg::InstantiateMsg {
-                admin: None,
+                creator: String::from(ADMIN),
                 name: String::from("nft2"),
                 symbol: String::from("NFT2"),
                 dates: mint::Dates::default(),

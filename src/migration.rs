@@ -11,10 +11,9 @@ use cw2::{get_contract_version, set_contract_version};
 pub fn migrate_with_conf(
     storage: &mut dyn Storage,
     version: String,
-    config: Option<Config>,
+    config: Config,
 ) -> Result<Response, ContractError> {
     let contract_version = get_contract_version(storage)?;
-    let config = config.unwrap();
 
     let old_name = contract_version.contract;
     let old_version = contract_version.version;

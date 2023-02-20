@@ -24,7 +24,7 @@ mod general {
             QueryMsg,
             MintBatchMsg,
         },
-        tests::helpers::tests_helpers::{
+        tests::test_helpers::tests_helpers::{
             now,
             get_init_msg,
             get_store_batch_msg,
@@ -47,7 +47,7 @@ mod general {
         let mut init_msg = get_init_msg(0,0);
 
         // ENABLE OWNERS BURN
-        init_msg.burn.owners = true;
+        init_msg.burn.owner_can_burn = true;
 
         instantiate(
             deps.as_mut(),
@@ -114,7 +114,7 @@ mod general {
         let mut init_msg = get_init_msg(0,0);
 
         // ENABLE OWNERS BURN
-        init_msg.burn.owners = true;
+        init_msg.burn.owner_can_burn = true;
 
         instantiate(
             deps.as_mut(),

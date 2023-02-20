@@ -24,7 +24,7 @@ mod general {
           QueryMsg,
           MintBatchMsg,
       },
-      tests::helpers::tests_helpers::{
+      tests::test_helpers::tests_helpers::{
           now,
           get_init_msg,
           get_store_batch_msg,

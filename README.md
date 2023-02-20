@@ -64,6 +64,74 @@ pub struct InstantiateMsg {
 }
 ```
 
+### mint::Burn structure
+
+```Rust
+pub struct Burn {
+  // peoplo who whold the tokens
+  pub owners: bool,
+
+  // the admin of the contract
+  pub admin: Option<String>,
+
+  // admin can burn owned
+  pub can_burn_owned: bool
+}
+```
+
+### mint::Dates structure
+
+```Rust
+// Start and end dates of the minting, both are optional
+// if there is a start it will accept mints in that date
+// if there is no end it's endless
+#[cw_serde]
+#[derive(Default)]
+pub struct Dates {
+  pub start: Option<Timestamp>,
+  pub end: Option<Timestamp>,
+}
+```
+
+### mint::Costs structure
+
+```Rust
+#[cw_serde]
+pub struct Costs {
+  pub denom: String,
+  pub amount: Uint128,
+}
+
+impl Default for Costs {
+    fn default() -> Self {
+        Self {
+          denom: String::from("ujuno"),
+          amount: Uint128::from(1000000u64)
+        }
+    }
+}
+```
+
+### mint::Wallet structure
+
+```Rust
+// sends funds to this wallet
+#[cw_serde]
+pub struct Wallet {
+  pub name: String,
+  pub wallet: Addr,
+}
+
+impl Default for Wallet {
+    fn default() -> Self {
+        Self {
+            name: String::from(""),
+            wallet: Addr::unchecked(String::from("")),
+        }
+    }
+}
+```
+
 ## Store conf msg syntax
 
 ```Rust
@@ -72,6 +140,17 @@ pub struct StoreConf {
     pub desc: String,
     pub ipfs: String,
     pub attributes: Vec<String>,
+}
+
+impl Default for StoreConf {
+    fn default() -> Self {
+        Self {
+            name: String::from("nft"),
+            desc: String::from("desc"),
+            ipfs: String::from("ipfs://"),
+            attributes: vec![],
+        }
+    }
 }
 ```
 

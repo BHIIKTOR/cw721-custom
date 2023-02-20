@@ -28,7 +28,7 @@ mod general {
         //     ExecuteMsg,
         //     QueryMsg,
         // },
-        tests::helpers::tests_helpers::{
+        tests::test_helpers::tests_helpers::{
             // get_store_batch_msg,
             get_init_msg,
         }
@@ -49,7 +49,7 @@ mod general {
         ).unwrap();
 
         let config = Config {
-            admin: String::from(ADMIN),
+            creator: String::from(ADMIN),
             name: String::from("nft2"),
             dates: mint::Dates::default(),
             cost: mint::Costs::default(),
@@ -63,14 +63,52 @@ mod general {
             paused: false,
         };
 
-        let msg : MigrateMsg<Option<Config>> = MigrateMsg::WithConfigClearState {
+        let msg : MigrateMsg<Config> = MigrateMsg::WithConfigClearState {
           version: String::from("2.0.0"),
-          config: Some(Some(config))
+          config
         };
 
         let res: Response = migrate(deps.as_mut(), mock_env(), msg).unwrap();
 
-        assert_eq!(res.attributes[0].value, String::from("migration"))
+        assert_eq!(res.attributes[0].value, String::from("migration"));
+        assert_eq!(res.attributes[1].value, String::from("2.0.0"))
     }
 
+    #[test]
+    fn migrate_with_conf() {
+        let mut deps = mock_dependencies();
+        let info = mock_info(ADMIN, &[]);
+
+        instantiate(
+            deps.as_mut(),
+            mock_env(),
+            info.clone(),
+            get_init_msg(0,0)
+        ).unwrap();
+
+        let config = Config {
+            creator: String::from(ADMIN),
+            name: String::from("nft2"),
+            dates: mint::Dates::default(),
+            cost: mint::Costs::default(),
+            burn: mint::Burn::default(),
+            token_supply: Default::default(),
+            wallet: mint::Wallet::default(),
+            max_mint_batch: Some(Uint128::from(8u32)),
+            store_conf: Default::default(),
+            token_total: Uint128::from(10000u32),
+            frozen: false,
+            paused: false,
+        };
+
+        let msg : MigrateMsg<Config> = MigrateMsg::WithConfig {
+          version: String::from("2.0.0"),
+          config
+        };
+
+        let res: Response = migrate(deps.as_mut(), mock_env(), msg).unwrap();
+
+        assert_eq!(res.attributes[0].value, String::from("migration"));
+        assert_eq!(res.attributes[1].value, String::from("2.0.0"))
+    }
 }

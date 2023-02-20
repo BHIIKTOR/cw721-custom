@@ -20,8 +20,8 @@ use crate::state::{
     CONFIG,
     Config,
     BURNT_AMOUNT,
-    BURNT_LIST,
-    BURNED
+    // BURNT_LIST,
+    // BURNED
 };
 
 pub fn query_config(deps: Deps) -> StdResult<Config> {
@@ -61,34 +61,34 @@ pub fn query_burnt_amount(
     BURNT_AMOUNT.may_load(deps.storage, &address)
 }
 
-pub fn query_burnt_list(
-    deps: Deps,
-    address: Addr,
-) -> StdResult<Option<Vec<String>>> {
-    BURNT_LIST.may_load(deps.storage, &address)
-}
+// pub fn query_burnt_list(
+//     deps: Deps,
+//     address: Addr,
+// ) -> StdResult<Option<Vec<String>>> {
+//     BURNT_LIST.may_load(deps.storage, &address)
+// }
 
-pub fn query_burned(
-    deps: Deps,
-    tokens: Vec<String>
-) -> StdResult<Vec<(String, bool)>> {
-    if tokens.len() > 30 {
-        return Err(StdError::generic_err("request too large"))
-    }
+// pub fn query_burned(
+//     deps: Deps,
+//     tokens: Vec<String>
+// ) -> StdResult<Vec<(String, bool)>> {
+//     if tokens.len() > 30 {
+//         return Err(StdError::generic_err("request too large"))
+//     }
 
-    let mut data: Vec<(String, bool)> = vec![];
+//     let mut data: Vec<(String, bool)> = vec![];
 
-    for token in tokens {
-        // match BURNED.may_load(deps.storage, token.clone()).unwrap() {
-        //     Some(item) => data.push((token, item)),
-        //     None => {}
-        // }
-        if let Some(item) = BURNED
-            .may_load(deps.storage, token.clone())
-            .unwrap() {
-                data.push((token, item))
-         }
-    }
+//     for token in tokens {
+//         // match BURNED.may_load(deps.storage, token.clone()).unwrap() {
+//         //     Some(item) => data.push((token, item)),
+//         //     None => {}
+//         // }
+//         if let Some(item) = BURNED
+//             .may_load(deps.storage, token.clone())
+//             .unwrap() {
+//                 data.push((token, item))
+//          }
+//     }
 
-    Ok(data)
-}
+//     Ok(data)
+// }

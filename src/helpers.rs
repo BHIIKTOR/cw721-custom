@@ -23,9 +23,9 @@ use crate::{
     CONFIG,
     Config,
     BURNT_AMOUNT,
-    BURNT_LIST,
-    BURNED,
-    Metadata
+    // BURNT_LIST,
+    // BURNED,
+    Metadata, PLEDGED_TOKENS
   }
 };
 
@@ -39,25 +39,27 @@ pub fn clear_state(
   state_config.paused = true;
   state_config.frozen = true;
 
-  BURNT_LIST.clear(storage);
+  // BURNT_LIST.clear(storage);
   BURNT_AMOUNT.clear(storage);
-  BURNED.clear(storage);
+  PLEDGED_TOKENS.clear(storage);
 
   CONFIG.save(storage, &state_config)?;
 
   Ok(())
 }
 
-// Check if sender is the configured contract owner or minter so they can update data
+// Check if sender is the configured contract creator so they can update sensitive data
 pub fn can_update(
   deps: &DepsMut,
   info: &MessageInfo
 ) -> Result<(), ContractError> {
-  let cw721_contract = CW721Contract::default();
+  // let cw721_contract = CW721Contract::default();
 
-  let minter = cw721_contract.minter.load(deps.storage)?;
+  // let minter = cw721_contract.minter.load(deps.storage)?;
 
-  if info.sender != minter {
+  let creator = CONFIG.load(deps.storage)?.creator;
+
+  if info.sender != creator {
       return Err(ContractError::Unauthorized {});
   }
 
@@ -83,23 +85,23 @@ pub fn update_burnt_amount(
 }
 
 // Update list of burnt tokens by given address
-pub fn update_burnt_list(
-  storage: &mut dyn Storage,
-  sender: &Addr,
-  token: &str,
-) -> Result<(), ContractError> {
-  match BURNT_LIST.load(storage, sender) {
-    Ok(mut list) => {
-        list.push(String::from(token));
-        BURNT_LIST.save(storage, sender, &list)?;
-        Ok(())
-    },
-    Err(_) => {
-        BURNT_LIST.save(storage, sender, &vec![String::from(token)])?;
-        Ok(())
-    }
-  }
-}
+// pub fn update_burnt_list(
+//   storage: &mut dyn Storage,
+//   sender: &Addr,
+//   token: &str,
+// ) -> Result<(), ContractError> {
+//   match BURNT_LIST.load(storage, sender) {
+//     Ok(mut list) => {
+//         list.push(String::from(token));
+//         BURNT_LIST.save(storage, sender, &list)?;
+//         Ok(())
+//     },
+//     Err(_) => {
+//         BURNT_LIST.save(storage, sender, &vec![String::from(token)])?;
+//         Ok(())
+//     }
+//   }
+// }
 
 pub fn check_token_exists_or_err(
   contract: &CW721Contract,
@@ -121,8 +123,6 @@ pub fn burn_token(
   sender: &Addr,
   check_owner: bool
 ) -> Result<(), ContractError> {
-  // check_token_exists_or_err(contract, storage, token_id)?;
-
   if check_owner {
     check_token_ownership_basic(sender, token)?;
   }
@@ -131,7 +131,9 @@ pub fn burn_token(
 
   contract.decrement_tokens(storage)?;
 
-  BURNED.save(storage, token_id.clone(), &true)?;
+  // BURNED.save(storage, token_id.clone(), &true)?;
+
+  PLEDGED_TOKENS.save(storage, token_id.clone(), &true)?;
 
   Ok(())
 }
@@ -150,10 +152,8 @@ pub fn burn_and_update(
 
   update_burnt_amount(storage, sender)?;
 
-  // add logs for whom of the owners burnt tokens
-  if check_owner {
-    update_burnt_list(storage, sender, token_id)?;
-  }
+  // add logs for whom of burnt tokens
+  // update_burnt_list(storage, sender, token_id)?;
 
   Ok(())
 }
@@ -282,6 +282,7 @@ pub fn can_mint(
       return Err(ContractError::MaxTokens {});
   }
 
+  // TODO: Review this
   // dont allow contract admin to become owner of tokens
   if sender == minter {
       return Err(ContractError::Unauthorized {})

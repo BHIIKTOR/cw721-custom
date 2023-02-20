@@ -65,8 +65,8 @@ pub struct StoreConfMsg {
 #[cw_serde]
 #[derive(Default)]
 pub struct InstantiateMsg {
-    // defaults to this msg sender
-    pub admin: Option<String>,
+    // this is the contract operator
+    pub creator: String,
 
     // Name of the NFT contract
     pub name: String,
@@ -100,7 +100,7 @@ impl From<InstantiateMsg> for CW721InstantiateMsg {
         CW721InstantiateMsg {
             name: msg.name,
             symbol: msg.symbol,
-            minter: msg.admin.unwrap(),
+            minter: msg.creator,
         }
     }
 }
@@ -121,6 +121,12 @@ pub enum ExecuteMsg {
 
     // update the initial config
     UpdateConf (InstantiateMsg),
+
+    // add token to pledge list
+    Pledge {
+        tokens: Vec<String>,
+    },
+
 
     // burn given token
     Burn {
@@ -283,10 +289,10 @@ impl From<QueryMsg> for CW721QueryMsg<Empty> {
 pub enum MigrateMsg<T> {
     WithConfigClearState {
         version: String,
-        config: Option<T>,
+        config: T,
     },
     WithConfig {
         version: String,
-        config: Option<T>,
+        config: T,
     }
 }

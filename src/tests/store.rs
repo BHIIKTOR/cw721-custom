@@ -23,7 +23,7 @@ mod general {
             ExecuteMsg,
             QueryMsg,
         },
-        tests::helpers::tests_helpers::{
+        tests::test_helpers::tests_helpers::{
             get_store_batch_msg,
             get_init_msg,
         }

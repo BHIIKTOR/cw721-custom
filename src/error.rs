@@ -11,8 +11,8 @@ pub enum ContractError {
     #[error("Unauthorized to execute request")]
     Unauthorized {},
 
-    #[error("Unauthorized to execute request: {msg} ({sender})")]
-    UnauthorizedWithMsg { msg: String, sender: String },
+    #[error("Unauthorized to execute request: {msg}")]
+    UnauthorizedWithMsg { msg: String },
 
     #[error("Approval not found for: {spender}")]
     ApprovalNotFound { spender: String },
@@ -40,6 +40,12 @@ pub enum ContractError {
 
     #[error("Token ({token_id}) not found")]
     TokenNotFound { token_id: String },
+
+    #[error("Token is not pledged ({token_id})")]
+    TokenNotPledged { token_id: String },
+
+    #[error("Token already pledged ({token_id})")]
+    TokenPledged { token_id: String },
 
     #[error("Contract is frozen")]
     ContractFrozen {},
@@ -107,9 +113,6 @@ pub enum ContractError {
 
     #[error["Migration failed, wrong strategy"]]
     MigrationWrongStrategy { },
-
-    #[error["Migration failed, no configuration"]]
-    MigrationConfNeeded { },
 
     #[error("Migration failed, During state clear {msg}")]
     MigrationFailedDuringStateClear { msg: String },

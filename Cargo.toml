@@ -5,9 +5,9 @@ authors = [
   "BHIKTOR"
 ]
 edition = "2018"
-description = "custom CW721 with no randomization, focused on batch operations"
+description = "custom CW721 with no randomization, focused on batch operations and burning tokens"
 license = "Apache-2.0"
-repository = "https://github.com/BHIIKTOR/cw721-offchain-randomization"
+repository = "https://github.com/BHIIKTOR/cw721-custom"
 homepage = ""
 documentation = ""
 

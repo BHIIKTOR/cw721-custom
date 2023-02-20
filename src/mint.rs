@@ -1,6 +1,9 @@
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Uint128, Timestamp, Addr};
 
+const DEFAULT_DENOM: &str = "ujuno";
+const DEFAULT_AMOUNT: u64 = 1000000u64;
+
 // sends funds to this wallet
 #[cw_serde]
 pub struct Wallet {
@@ -17,6 +20,7 @@ impl Default for Wallet {
     }
 }
 
+// TODO: implement multiple denoms
 // accepted denom and cost of the minting
 #[cw_serde]
 pub struct Costs {
@@ -27,8 +31,8 @@ pub struct Costs {
 impl Default for Costs {
     fn default() -> Self {
         Self {
-          denom: String::from("ujuno"),
-          amount: Uint128::from(1000000u64)
+          denom: String::from(DEFAULT_DENOM),
+          amount: Uint128::from(DEFAULT_AMOUNT)
         }
     }
 }
@@ -43,35 +47,13 @@ pub struct Dates {
   pub end: Option<Timestamp>,
 }
 
-// impl Default for Dates {
-//     fn default() -> Self {
-//         Self { start: None, end: None }
-//     }
-// }
-
 // Who can burn the tokens
 #[cw_serde]
 #[derive(Default)]
 pub struct Burn {
-  // peoplo who whold the tokens
-  pub owners: bool,
+  // peoplo who hold the tokens
+  pub owner_can_burn: bool,
 
-  // the admin of the contract
-  pub admin: Option<String>,
-
-  // admin can burn owned
+  // creator can burn tokens owned by others
   pub can_burn_owned: bool,
-
-  // allow admin and owners to burn
-  pub both_can_burn: Option<bool>
 }
-
-// impl Default for Burn {
-//   fn default() -> Self {
-//       Self {
-//         owners: false,
-//         admin: None,
-//         can_burn_owned: false
-//       }
-//   }
-// }
