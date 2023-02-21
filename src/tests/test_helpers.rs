@@ -69,9 +69,9 @@ pub mod tests_helpers {
   }
 
   pub fn get_store_batch_msg (
+    num: usize
   ) -> BatchStoreMsg {
       let mut batch: Vec<MintMsg<Extension>> = vec![];
-      let num: usize = 20;
 
       for elem in 0..num {
           batch.push(get_mint_msg(format!("{}", elem)));

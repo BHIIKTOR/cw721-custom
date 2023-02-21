@@ -52,7 +52,7 @@ mod general {
           deps.as_mut(),
           mock_env(),
           mock_info(ADMIN, &[]),
-          ExecuteMsg::StoreBatch(get_store_batch_msg())
+          ExecuteMsg::StoreBatch(get_store_batch_msg(20))
       ).unwrap();
 
       let exec_mint = ExecuteMsg::Mint();
@@ -88,7 +88,7 @@ mod general {
           deps.as_mut(),
           mock_env(),
           mock_info(ADMIN, &[]),
-          ExecuteMsg::StoreBatch(get_store_batch_msg())
+          ExecuteMsg::StoreBatch(get_store_batch_msg(20))
       ).unwrap();
 
       // MINTING 10 TOKENS
@@ -130,7 +130,7 @@ mod general {
           deps.as_mut(),
           mock_env(),
           mock_info(ADMIN, &[]),
-          ExecuteMsg::StoreBatch(get_store_batch_msg())
+          ExecuteMsg::StoreBatch(get_store_batch_msg(20))
       ).unwrap();
 
       // TRY TO MINT 10 TOKENS

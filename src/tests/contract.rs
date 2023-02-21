@@ -59,6 +59,45 @@ mod general {
     }
 
     #[test]
+    #[should_panic(expected = "ContractFrozen")]
+    fn update_conf_frozen() {
+        let mut deps = mock_dependencies();
+        let info = mock_info(ADMIN, &[]);
+        let init_msg = get_init_msg(0, 900);
+
+        instantiate(deps.as_mut(), mock_env(), info.clone(), init_msg).unwrap();
+
+        let msg = ExecuteMsg::Freeze();
+
+        let res: Response = execute(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
+
+        assert_eq!(res.attributes[0].value, "freeze");
+
+        // store batch
+        let res: Response = execute(
+            deps.as_mut(),
+            mock_env(),
+            info,
+            ExecuteMsg::UpdateConf(crate::msg::InstantiateMsg {
+                creator: String::from(ADMIN),
+                name: String::from("nft2"),
+                symbol: String::from("NFT2"),
+                dates: mint::Dates::default(),
+                cost: mint::Costs::default(),
+                burn: mint::Burn::default(),
+                token_supply: Default::default(),
+                wallet: mint::Wallet::default(),
+                max_mint_batch: Some(Uint128::from(8u32)),
+                store_conf: Default::default(),
+            })
+        ).unwrap();
+
+       assert_eq!(res.attributes[0].value, "config");
+       assert_eq!(res.attributes[1].value, "update");
+       assert_eq!(res.attributes[2].value, "success");
+    }
+
+    #[test]
     fn pause() {
         let mut deps = mock_dependencies();
         let info = mock_info(ADMIN, &[]);

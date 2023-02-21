@@ -8,8 +8,8 @@ pub type CW721Contract<'a> = cw721_base::Cw721Contract<'a, Extension, Empty, Emp
 
 pub const CONFIG: Item<Config> = Item::new("conf");
 
-pub const BURNT_AMOUNT: Map<&Addr, Uint128> = Map::new("burnt_amount");
-pub const PLEDGED_TOKENS_BY_ADDR: Map<&Addr, Vec<String>> = Map::new("addr_pledged");
+pub const BURNT_AMOUNT: Map<&Addr, Uint128> = Map::new("burnt");
+pub const PLEDGED_TOKENS_BY_ADDR: Map<&Addr, Vec<String>> = Map::new("pba");
 pub const PLEDGED_TOKENS: Map<String, bool> = Map::new("pledged");
 
 // use cw_utils::{Expiration, Scheduled};

@@ -86,7 +86,7 @@ mod general {
             deps.as_mut(),
             mock_env(),
             info,
-            ExecuteMsg::StoreBatch(get_store_batch_msg())
+            ExecuteMsg::StoreBatch(get_store_batch_msg(20))
         ).unwrap();
 
         assert_eq!(res.attributes[0].value, "store_batch");

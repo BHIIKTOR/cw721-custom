@@ -1,4 +1,5 @@
 # TODO ASAP
+* change all load/save handling from state to full blown tx error by implementing the map/collect pattern
 * finish changing minter and admin to creator addr
 * review all the code you fool EVEN THE TESTS
 * add more info of the features to the README.md

@@ -5,7 +5,7 @@ use cosmwasm_std::{
     Response,
     BankMsg,
     CosmosMsg,
-    Uint128, Storage,
+    Uint128, Storage, StdError, StdResult,
 };
 
 use cw721_base::{ MintMsg };
@@ -154,29 +154,30 @@ pub fn execute_transfer_batch(
 ) -> Result<Response, ContractError> {
     let cw721_contract = CW721Contract::default();
 
-    let mut results = vec![];
-
     let recipient_address = &deps.api.addr_validate(&transfer.recipient)?;
 
-    for token_id in transfer.tokens {
-        let token = cw721_contract.tokens.load(deps.storage, &token_id)?;
+    let results: Vec<String> = transfer.tokens
+        .into_iter()
+        .map(|token_id| {
+            let token = cw721_contract.tokens.load(deps.storage, &token_id)?;
 
-        match transfer_nft(
-            deps.storage,
-            &env,
-            &cw721_contract,
-            &info,
-            recipient_address,
-            &token,
-            &token_id
-        ) {
-            Ok(_) => results.push(token_id.to_string()),
-            Err(e) => {
-                let v = vec![token_id, e.to_string()];
-                results.push(v.join(", "))
-            },
-        }
-    }
+            let res = transfer_nft(
+                deps.storage,
+                &env,
+                &cw721_contract,
+                &info,
+                recipient_address,
+                &token,
+                &token_id
+            );
+
+            if res.is_err() {
+                return Err(StdError::GenericErr { msg: res.err().unwrap().to_string() })
+            }
+
+            Ok(res.unwrap())
+        })
+        .collect::<StdResult<Vec<_>>>()?;
 
     Ok(
         Response::new()
@@ -196,88 +197,42 @@ pub fn execute_pledge(
     let cw721_contract = CW721Contract::default();
 
     let config = CONFIG.load(deps.storage)?;
-    let mut pledged_list: Vec<String> = Vec::with_capacity(tokens.len());
-    let mut errors: Vec<String> = Vec::with_capacity(tokens.len());
 
     let mut response: Response = Response::default().add_attribute("action", "pledge");
 
-    let mut handle_error = |
-        e: ContractError
-    | {
-        errors.push(e.to_string())
-    };
-
-    tokens
+    let mut pledged_list: Vec<String> = tokens
         .into_iter()
-        .for_each(|token_id| {
-            if !cw721_contract.tokens.has(deps.storage, &token_id) {
-                handle_error(ContractError::DontExists { });
-                return
+        .map(|token_id| {
+            if cw721_contract.tokens.has(deps.storage, &token_id) == false {
+                return Err(StdError::GenericErr { msg: ContractError::DontExists { }.to_string() });
             }
 
-            let res = cw721_contract.tokens.load(deps.storage, &token_id);
+            let token = cw721_contract.tokens.load(deps.storage, &token_id)?;
 
-            if res.is_err() {
-                handle_error(ContractError::Std( res.err().unwrap() ));
-                return
-            }
-
-            let token = res.unwrap();
-
-            if token.owner == info.sender || info.sender == config.creator {
+            if info.sender == token.owner || info.sender == config.creator {
                 if PLEDGED_TOKENS.has(deps.storage, token_id.clone()) {
-                    let res = PLEDGED_TOKENS.load(deps.storage, token_id.clone());
-
-                    if res.is_err() {
-                        handle_error(ContractError::Std( res.err().unwrap() ));
-                        return
-                    }
-
-                    // if the value is true finish the operation
-                    // token has been burned already
-                    if res.unwrap() {
-                        handle_error(ContractError::TokenPledged { token_id });
-                        return
-                    }
+                    return Err(StdError::GenericErr { msg: ContractError::TokenPledged { token_id: token_id.clone() }.to_string() });
                 }
 
-                let res = PLEDGED_TOKENS.save(deps.storage, token_id.clone(), &false);
+                PLEDGED_TOKENS.save(deps.storage, token_id.clone(), &false)?;
 
-                if res.is_err() {
-                    handle_error(ContractError::Std( res.err().unwrap() ));
-                    return
-                }
-
-                pledged_list.push(token_id)
-            } else {
-                handle_error(ContractError::Unauthorized { });
+                return Ok(token_id)
             }
-        });
+
+            return Err(StdError::GenericErr { msg: ContractError::Unauthorized { }.to_string() })
+        })
+        .collect::<StdResult<Vec<_>>>()?;
 
     if !pledged_list.is_empty() {
-        // add pledged tokens to address
+        // check if address has more pledged tokens and add them
         if PLEDGED_TOKENS_BY_ADDR.has(deps.storage, &info.sender) {
             let mut old = PLEDGED_TOKENS_BY_ADDR.load(deps.storage, &info.sender)?;
             pledged_list.append(&mut old);
         }
 
-        let res = PLEDGED_TOKENS_BY_ADDR.save(deps.storage, &info.sender, &pledged_list);
+        PLEDGED_TOKENS_BY_ADDR.save(deps.storage, &info.sender, &pledged_list)?;
 
-        if res.is_err() {
-            pledged_list
-                .into_iter()
-                .for_each(|token_id| {
-                    PLEDGED_TOKENS.remove(deps.storage, token_id);
-                });
-
-            handle_error(ContractError::Std( res.err().unwrap() ));
-        } else {
-            response = response.add_attribute("list", format!("{:?}", pledged_list));
-        }
-    }
-
-    if !errors.is_empty() {
-        response = response.add_attribute("errors", format!("{:?}", errors));
+        response = response.add_attribute("list", format!("{:?}", pledged_list))
     }
 
     Ok(response)
@@ -316,8 +271,6 @@ pub fn execute_burn(
     }
 
     if config.burn.can_burn_owned && config.creator == info.sender {
-        // validate sender permissions
-        // can_update(&deps, &info)?;
         burn_and_update(
             &cw721_contract,
             deps.storage,
@@ -330,7 +283,7 @@ pub fn execute_burn(
 
         return Ok(Response::new()
             .add_attribute("action", "burn")
-            .add_attribute("sub", "admin_burn")
+            .add_attribute("sub", "creator_burn")
             .add_attribute("token_id", token_id))
     } else if token.owner != info.sender {
         return Err(ContractError::UnauthorizedWithMsg {
@@ -341,8 +294,8 @@ pub fn execute_burn(
     Ok(Response::new()
         .add_attribute("action", "burn_nothing")
         .add_attribute("why", "configuration")
-        .add_attribute("owners_can_burn", config.burn.owner_can_burn.to_string())
-        .add_attribute("admin_can_burn", "true")
+        .add_attribute("owner_can_burn", config.burn.owner_can_burn.to_string())
+        .add_attribute("creator_can_burn", "true")
     )
 }
 
@@ -355,7 +308,7 @@ pub fn execute_burn_batch(
     let cw721_contract = CW721Contract::default();
     let config = CONFIG.load(deps.storage)?;
 
-    if tokens.len() > 30 {
+    if tokens.len() >= 30 {
         return Err(ContractError::RequestTooLarge{ size: tokens.len() })
     }
 
@@ -363,19 +316,7 @@ pub fn execute_burn_batch(
         return Err(ContractError::RequestTooSmall{ size: tokens.len() })
     }
 
-    let mut owner_burn = false;
-    let mut admin_burn = false;
-    let mut errors: Vec<String> = Vec::with_capacity(tokens.len());
     let mut response;
-
-    let mut handle_error = |
-        is_err: bool,
-        e: Option<ContractError>
-    | {
-        if is_err {
-            errors.push(e.unwrap().to_string())
-        }
-    };
 
     let call_burn_and_update = |
         storage: &mut dyn Storage,
@@ -394,75 +335,57 @@ pub fn execute_burn_batch(
         )
     };
 
-    let token_list: Vec<(bool, String)> = tokens
-        .into_iter()
-        .map(|token_id| {
-            if !cw721_contract.tokens.has(deps.storage, &token_id) {
-                handle_error(true, Some(ContractError::DontExists { }));
-                return (false, token_id)
-            }
-
-            if !PLEDGED_TOKENS.has(deps.storage, token_id.clone()) {
-                handle_error(true, Some(ContractError::TokenNotPledged { token_id: token_id.clone() }));
-                return (false, token_id)
-            }
-
-            let token = cw721_contract.tokens.load(deps.storage, token_id.as_str()).unwrap();
-
-            let no_auth = ContractError::UnauthorizedWithMsg {
-                msg: "sender is not owner".to_string()
-            };
-
-            if config.burn.owner_can_burn && token.owner == info.sender {
-                // NOTE: IS THIS EFFICIENT?
-                owner_burn = true;
-
-                if token.owner == config.creator {
-                    handle_error(true, Some(no_auth))
-                } else {
-                    let op_res = call_burn_and_update(deps.storage, &token, &token_id, true);
-
-                    handle_error(op_res.is_err(), op_res.err());
-
-                    return (true, token_id)
+    let mut process_tokens = |tokens: Vec<String>| -> Vec<String> {
+        tokens
+            .into_iter()
+            .map(|token_id| {
+                if !cw721_contract.tokens.has(deps.storage, &token_id) {
+                    return Err(StdError::GenericErr { msg: ContractError::DontExists { }.to_string() })
                 }
-            } else if config.creator == info.sender {
-                // NOTE: IS THIS EFFICIENT?
-                admin_burn = true;
 
-                let op_res = call_burn_and_update(deps.storage, &token, &token_id, !config.burn.can_burn_owned);
+                if !PLEDGED_TOKENS.has(deps.storage, token_id.clone()) {
+                    return Err(StdError::GenericErr { msg: ContractError::TokenNotPledged { token_id: token_id.clone() }.to_string() })
+                }
 
-                handle_error(op_res.is_err(), op_res.err());
+                let token = cw721_contract.tokens.load(deps.storage, token_id.as_str())?;
 
-                return (true, token_id)
-            }
+                if token.owner == info.sender || config.creator == info.sender {
+                    let res = call_burn_and_update(deps.storage, &token, &token_id, false);
+                    if res.is_err() {
+                        return Err(StdError::GenericErr { msg: res.err().unwrap().to_string() })
+                    }
+                } else {
+                    return Err(StdError::GenericErr { msg: ContractError::UnauthorizedWithMsg {
+                        msg: "sender is not owner".to_string()
+                    }.to_string() })
+                }
 
-            (false, token_id)
-        })
-        .collect();
+                Ok(token_id)
+            })
+            .collect::<StdResult<Vec<_>>>()
+            .unwrap()
+    };
 
-    if owner_burn {
+    let token_list = process_tokens(tokens);
+
+    if token_list.len() > 0 {
         response = Response::new()
-            .add_attribute("action", "burn_batch")
-            .add_attribute("sub", "owner_burn")
-    } else if admin_burn {
-        response = Response::new()
-            .add_attribute("action", "burn_batch")
-            .add_attribute("sub", "admin_burn")
+            .add_attribute("action", "burn_batch");
+        if info.sender == config.creator {
+            response = Response::new()
+                .add_attribute("action", "burn_batch")
+                .add_attribute("sub", "creator_burn")
+        }
     } else {
         response = Response::new()
             .add_attribute("action", "burn_nothing")
             .add_attribute("why", "configuration")
             .add_attribute("owners_can_burn", config.burn.owner_can_burn.to_string())
-            .add_attribute("admin_can_burn", "true");
+            .add_attribute("creator_can_burn", "true")
     }
 
     if response.attributes[0].value != "burn_nothing" {
         response = response.add_attribute("results", format!("{:?}", token_list));
-
-        if !errors.is_empty() {
-            response = response.add_attribute("errors", format!("{:?}", errors));
-        }
     }
 
     Ok(response)
