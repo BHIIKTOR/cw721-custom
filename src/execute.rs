@@ -316,7 +316,7 @@ pub fn execute_burn_batch(
         return Err(ContractError::RequestTooSmall{ size: tokens.len() })
     }
 
-    let mut response;
+    let mut response: Response = Response::default();
 
     let call_burn_and_update = |
         storage: &mut dyn Storage,
@@ -366,26 +366,26 @@ pub fn execute_burn_batch(
             .unwrap()
     };
 
-    let token_list = process_tokens(tokens);
+    if config.burn.owner_can_burn || config.burn.can_burn_owned {
+        let token_list = process_tokens(tokens);
 
-    if token_list.len() > 0 {
-        response = Response::new()
-            .add_attribute("action", "burn_batch");
-        if info.sender == config.creator {
-            response = Response::new()
-                .add_attribute("action", "burn_batch")
-                .add_attribute("sub", "creator_burn")
+        if token_list.len() > 0 {
+            response = response.add_attribute("action", "burn_batch");
+
+            if info.sender == config.creator {
+                response = response.add_attribute("sub", "creator_burn")
+            } else {
+                response = response.add_attribute("sub", "owner_burn")
+            }
         }
+
+        response = response.add_attribute("results", format!("{:?}", token_list));
     } else {
-        response = Response::new()
+        response = response
             .add_attribute("action", "burn_nothing")
             .add_attribute("why", "configuration")
             .add_attribute("owners_can_burn", config.burn.owner_can_burn.to_string())
             .add_attribute("creator_can_burn", "true")
-    }
-
-    if response.attributes[0].value != "burn_nothing" {
-        response = response.add_attribute("results", format!("{:?}", token_list));
     }
 
     Ok(response)
@@ -476,29 +476,19 @@ pub fn execute_mint_batch(
         .add_attribute("owner", &info.sender)
         .add_attribute("requested", msg.amount.to_string());
 
-    let mut errors : Vec<String> = Vec::new();
-
     while Uint128::from(total_minted) < mint_amount {
         //atempt to mint
-        let res = try_mint(
+        try_mint(
             deps.storage,
             &info.sender,
             &minter,
             &cw721_contract,
             &current_token_id.to_string()
-        );
+        )?;
 
-        // push token id to the ids list
-        if res.is_ok() {
-            total_minted += 1;
-            current_token_id += Uint128::one();
-            ids.push(current_token_id.to_string())
-        }
-
-        // push error msg to response msg
-        if res.is_err() {
-            errors.push(format!("token: {}, error: {}", current_token_id, res.unwrap_err()))
-        }
+        total_minted += 1;
+        current_token_id += Uint128::one();
+        ids.push(current_token_id.to_string())
     }
 
     coin_found.amount = config.cost.amount * Uint128::from(total_minted);
@@ -506,10 +496,6 @@ pub fn execute_mint_batch(
     response_msg = response_msg.add_attribute("minted", total_minted.to_string())
         .add_attribute("cost", coin_found.amount.to_string())
         .add_attribute("list", format!("{:?}", ids));
-
-    if !errors.is_empty() {
-        response_msg = response_msg.add_attribute("errors", format!("{:?}", errors));
-    }
 
     // send funds to the configured funds wallet
     response_msg = response_msg.add_message(
@@ -555,11 +541,13 @@ pub fn execute_store_batch(
     let cw721_contract = CW721Contract::default();
     let minter = cw721_contract.minter.load(deps.storage)?;
 
-    for nft_data in &data.batch {
-        try_store(deps.storage, nft_data, &minter, &cw721_contract)?;
-    }
+    let total = data.batch.len();
 
-    let batch_total = Uint128::from(data.batch.len() as u32);
+    data.batch.into_iter().try_for_each(|nft_data| {
+        try_store(deps.storage, &nft_data, &minter, &cw721_contract)
+    })?;
+
+    let batch_total = Uint128::from(total as u32);
 
     // batch size is summed in the operation below and returns the new total
     let total = update_total(deps.storage, &batch_total)?;

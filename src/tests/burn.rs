@@ -196,7 +196,8 @@ mod general {
         ).unwrap();
 
         assert_eq!(res.attributes[0].value, "burn_batch");
-        assert_eq!(res.attributes[1].value, "[\"0\", \"1\", \"2\"]");
+        assert_eq!(res.attributes[1].value, "owner_burn");
+        assert_eq!(res.attributes[2].value, "[\"0\", \"1\", \"2\"]");
     }
 
     #[test]
@@ -587,7 +588,6 @@ mod general {
 
     #[test]
     fn burn_nothing() {
-
         let mut deps = mock_dependencies();
         let mut info = mock_info(ADMIN, &[]);
 
@@ -812,7 +812,92 @@ mod general {
 
     #[test]
     fn burn_batch_burn_nothing() {
-        unimplemented!()
+
+        let mut deps = mock_dependencies();
+        let mut info = mock_info(ADMIN, &[]);
+
+        let mut init_msg = get_init_msg(0,0);
+
+        // ENABLE OWNERS BURN
+        init_msg.burn.owner_can_burn = false;
+        init_msg.burn.can_burn_owned = false;
+
+        instantiate(
+            deps.as_mut(),
+            mock_env(),
+            info.clone(),
+            init_msg
+        ).unwrap();
+
+        // store batch
+        let res = execute(
+            deps.as_mut(),
+            mock_env(),
+            info.clone(),
+            ExecuteMsg::StoreBatch(get_store_batch_msg(20))
+        ).unwrap();
+
+        assert_eq!(res.attributes[0].value, "store_batch");
+        assert_eq!(res.attributes[1].key, "token_total");
+        assert_eq!(res.attributes[1].value, "20");
+
+        let query_msg: QueryMsg = QueryMsg::OwnerOf {
+            token_id: String::from("0"),
+            include_expired: Some(true)
+        };
+
+        let res: OwnerOfResponse = from_binary(&query(deps.as_ref(), mock_env(), query_msg).unwrap()).unwrap();
+
+        assert_eq!(res.owner, ADMIN);
+
+        let exec_mint = ExecuteMsg::MintBatch(MintBatchMsg {
+            amount: Uint128::from(10u32)
+        });
+
+        let mut env = mock_env();
+        env.block.time = now();
+
+        // SEND EXACT AMOUNT FOR IT TO ACCEPT THE TRANSACTION
+        execute(deps.as_mut(), env, mock_info(MINTER, &[
+            Coin::new(40000000u128, DENOM.to_string())
+        ]), exec_mint).unwrap();
+
+        // CHANGE ORIGINAL SENDER TO MINTER
+        info.sender = Addr::unchecked(MINTER);
+
+        // PLEDGE
+        let res = execute(
+            deps.as_mut(),
+            mock_env(),
+            info.clone(),
+            ExecuteMsg::Pledge {
+                tokens: vec![
+                    String::from("0"),
+                    String::from("1"),
+                    String::from("2")
+                ]
+            }
+        ).unwrap();
+
+        assert_eq!(res.attributes[0].value, "pledge");
+        assert_eq!(res.attributes[1].key, "list");
+        assert_eq!(res.attributes[1].value, "[\"0\", \"1\", \"2\"]");
+
+        // BURN BABY BURN
+        let res = execute(
+            deps.as_mut(),
+            mock_env(),
+            info,
+            ExecuteMsg::BurnBatch {
+                tokens: vec![
+                    String::from("0"),
+                    String::from("1"),
+                    String::from("2")
+                ]
+            }
+        ).unwrap();
+
+        assert_eq!(res.attributes[0].value, "burn_nothing");
     }
 }
 
