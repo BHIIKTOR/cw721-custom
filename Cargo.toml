@@ -5,7 +5,7 @@ authors = [
   "BHIKTOR"
 ]
 edition = "2018"
-description = "custom CW721 with no randomization, focused on batch operations and burning tokens"
+description = "custom CW721 - focused on batch operations and custom burning logic"
 license = "Apache-2.0"
 repository = "https://github.com/BHIIKTOR/cw721-custom"
 homepage = ""
@@ -40,3 +40,4 @@ thiserror = { version = "1.0.30" }
 
 [dev-dependencies]
 cosmwasm-schema = { version = "1.0.0-beta8" }
+cw-multi-test = "0.16.2"

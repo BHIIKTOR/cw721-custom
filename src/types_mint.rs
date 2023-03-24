@@ -1,8 +1,8 @@
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Uint128, Timestamp, Addr};
 
-const DEFAULT_DENOM: &str = "ujuno";
-const DEFAULT_AMOUNT: u64 = 1000000u64;
+const DEFAULT_DENOM: &str = "ujunox";
+const DEFAULT_AMOUNT: u64 = 10000000u64;
 
 // sends funds to this wallet
 #[cw_serde]

@@ -13,7 +13,10 @@ pub const PLEDGED_TOKENS_BY_ADDR: Map<&Addr, Vec<String>> = Map::new("pba");
 pub const PLEDGED_TOKENS: Map<String, bool> = Map::new("pledged");
 
 // use cw_utils::{Expiration, Scheduled};
-use crate::{msg::StoreConf, mint};
+use crate::{
+    msg::StoreConf,
+    types_mint
+};
 
 #[cw_serde]
 pub struct Config {
@@ -21,11 +24,11 @@ pub struct Config {
     pub name: String,
     pub token_supply: Uint128,
     pub token_total: Uint128,
-    pub cost: mint::Costs,
-    pub dates: mint::Dates,
+    pub cost: types_mint::Costs,
+    pub dates: types_mint::Dates,
     pub max_mint_batch: Option<Uint128>,
-    pub burn: mint::Burn,
-    pub wallet: mint::Wallet,
+    pub burn: types_mint::Burn,
+    pub wallet: types_mint::Wallet,
     pub store_conf: StoreConf,
     pub frozen: bool,
     pub paused: bool,

@@ -201,7 +201,7 @@ mod general {
     }
 
     #[test]
-    fn admin_can_burn_owned() {
+    fn creator_can_burn_owned() {
         let mut deps = mock_dependencies();
         let mut info = mock_info(ADMIN, &[]);
 
@@ -279,7 +279,7 @@ mod general {
 
     #[test]
     #[should_panic(expected = "Unauthorized")]
-    fn admin_cant_burn_owned() {
+    fn creator_cant_burn_owned() {
         let mut deps = mock_dependencies();
         let info = mock_info(ADMIN, &[]);
 
@@ -442,7 +442,7 @@ mod general {
     }
 
     #[test]
-    fn admin_burn_batch() {
+    fn creator_burn_batch() {
         let mut deps = mock_dependencies();
         let mut info = mock_info(ADMIN, &[]);
         let mut msg = get_init_msg(0, 900);

@@ -15,7 +15,7 @@ use cw721_base::{
 
 use crate::{
     state::Extension,
-    mint,
+    types_mint,
 };
 
 pub type MintMsg = CW721MintMsg<Extension>;
@@ -65,34 +65,49 @@ pub struct StoreConfMsg {
 #[cw_serde]
 #[derive(Default)]
 pub struct InstantiateMsg {
-    // this is the contract operator
+    // This is the contract operator
     pub creator: String,
 
     // Name of the NFT contract
     pub name: String,
 
-    // symbol of the NFT
+    // Symbol of the NFT
     pub symbol: String,
 
-    // pub minter: String,
+    pub dates: types_mint::Dates,
 
-    pub dates: mint::Dates,
+    pub cost: types_mint::Costs,
 
-    pub cost: mint::Costs,
+    pub burn: types_mint::Burn,
 
-    pub burn: mint::Burn,
-
-    // maximum token supply
+    // Maximum token supply
     pub token_supply: Uint128,
 
-    // wallet that recieves the funds
-    pub wallet: mint::Wallet,
+    // Wallet that recieves the funds
+    pub wallet: types_mint::Wallet,
 
-    // defaults to 10
+    // Defaults to 10
     pub max_mint_batch: Option<Uint128>,
 
     // Used for StoreConf call but can be provided during the call
     pub store_conf: StoreConf,
+}
+
+impl InstantiateMsg {
+    pub fn new(creator: String) -> Self {
+        Self {
+            creator,
+            name: Default::default(),
+            symbol: Default::default(),
+            dates: Default::default(),
+            cost: Default::default(),
+            burn: Default::default(),
+            token_supply: Default::default(),
+            wallet: Default::default(),
+            max_mint_batch: Default::default(),
+            store_conf: Default::default(),
+        }
+    }
 }
 
 impl From<InstantiateMsg> for CW721InstantiateMsg {

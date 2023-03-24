@@ -9,7 +9,7 @@ pub mod tests_helpers {
   use cw721_base::MintMsg;
 
   use crate::{
-    mint,
+    types_mint,
     msg::{
       InstantiateMsg,
       BatchStoreMsg,
@@ -49,18 +49,18 @@ pub mod tests_helpers {
           name: "nft".to_string(),
           symbol: "NFT".to_string(),
           creator: String::from(ADMIN),
-          wallet: mint::Wallet { name: "admin".to_string(), wallet: Addr::unchecked(FUNDWALLET.to_string()) },
+          wallet: types_mint::Wallet { name: "admin".to_string(), wallet: Addr::unchecked(FUNDWALLET.to_string()) },
           token_supply: Uint128::from(SUPPLY),
           max_mint_batch: None,
-          cost: mint::Costs {
+          cost: types_mint::Costs {
             denom: DENOM.to_string(),
             amount: Uint128::from(COST),
           },
-          dates: mint::Dates {
+          dates: types_mint::Dates {
             start: Some(Timestamp::from_seconds(star_mint)),
             end: Some(Timestamp::from_seconds(0).plus_seconds(end_mint))
           },
-          burn: mint::Burn {
+          burn: types_mint::Burn {
             owner_can_burn: true,
             can_burn_owned: false,
           },

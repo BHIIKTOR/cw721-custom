@@ -11,7 +11,7 @@ mod general {
         mock_info,
     };
 
-    use crate::mint;
+    use crate::types_mint;
     use crate::{
         contract::{
             execute,
@@ -43,11 +43,11 @@ mod general {
                 creator: String::from(ADMIN),
                 name: String::from("nft2"),
                 symbol: String::from("NFT2"),
-                dates: mint::Dates::default(),
-                cost: mint::Costs::default(),
-                burn: mint::Burn::default(),
+                dates: types_mint::Dates::default(),
+                cost: types_mint::Costs::default(),
+                burn: types_mint::Burn::default(),
                 token_supply: Default::default(),
-                wallet: mint::Wallet::default(),
+                wallet: types_mint::Wallet::default(),
                 max_mint_batch: Some(Uint128::from(8u32)),
                 store_conf: Default::default(),
             })
@@ -82,11 +82,11 @@ mod general {
                 creator: String::from(ADMIN),
                 name: String::from("nft2"),
                 symbol: String::from("NFT2"),
-                dates: mint::Dates::default(),
-                cost: mint::Costs::default(),
-                burn: mint::Burn::default(),
+                dates: types_mint::Dates::default(),
+                cost: types_mint::Costs::default(),
+                burn: types_mint::Burn::default(),
                 token_supply: Default::default(),
-                wallet: mint::Wallet::default(),
+                wallet: types_mint::Wallet::default(),
                 max_mint_batch: Some(Uint128::from(8u32)),
                 store_conf: Default::default(),
             })

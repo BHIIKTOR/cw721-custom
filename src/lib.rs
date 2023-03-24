@@ -6,6 +6,6 @@ pub mod migration;
 pub mod msg;
 pub mod query;
 pub mod state;
-pub mod mint;
+pub mod types_mint;
 
 mod tests;

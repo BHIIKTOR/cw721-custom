@@ -5,7 +5,7 @@ The whole idea of this contract is to implement the CW721 standard.
 It lacks things, like minting a random token instead of doing it sequentially, but this is yet a WPI (so far).
 
 The contract allows for three different types of methods for storing token metadata:
-* store - stores one token medata
+* store - stores one token metadata
 * store batch - batch metadata token storing with "heavy" costs
 * store conf - An optimized TX that accepts the repetitive info once and the attributes for the metadata in bulk
 

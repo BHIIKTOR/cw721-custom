@@ -73,7 +73,7 @@ pub fn instantiate(
         paused: false,
     };
 
-    // We use the set_contract_version function that we loaded above using cw2
+    // set our version :)
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
     // We save the config to the state

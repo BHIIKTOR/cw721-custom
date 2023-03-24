@@ -17,7 +17,7 @@ mod general {
     // use crate::msg::{StoreConfMsg, StoreConf, MigrateMsg, InstantiateMsg};
     use crate::state::Config;
     use crate::{
-        mint,
+        types_mint,
         contract::{
             // execute,
             instantiate,
@@ -51,11 +51,11 @@ mod general {
         let config = Config {
             creator: String::from(ADMIN),
             name: String::from("nft2"),
-            dates: mint::Dates::default(),
-            cost: mint::Costs::default(),
-            burn: mint::Burn::default(),
+            dates: types_mint::Dates::default(),
+            cost: types_mint::Costs::default(),
+            burn: types_mint::Burn::default(),
             token_supply: Default::default(),
-            wallet: mint::Wallet::default(),
+            wallet: types_mint::Wallet::default(),
             max_mint_batch: Some(Uint128::from(8u32)),
             store_conf: Default::default(),
             token_total: Uint128::from(10000u32),
@@ -89,11 +89,11 @@ mod general {
         let config = Config {
             creator: String::from(ADMIN),
             name: String::from("nft2"),
-            dates: mint::Dates::default(),
-            cost: mint::Costs::default(),
-            burn: mint::Burn::default(),
+            dates: types_mint::Dates::default(),
+            cost: types_mint::Costs::default(),
+            burn: types_mint::Burn::default(),
             token_supply: Default::default(),
-            wallet: mint::Wallet::default(),
+            wallet: types_mint::Wallet::default(),
             max_mint_batch: Some(Uint128::from(8u32)),
             store_conf: Default::default(),
             token_total: Uint128::from(10000u32),
