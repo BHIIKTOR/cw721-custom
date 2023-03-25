@@ -1,9 +1,9 @@
 #[cfg(test)]
 pub mod tests_helpers {
+  use cw_multi_test::{Contract, ContractWrapper};
 
   use cosmwasm_std::{
-    Uint128,
-    Timestamp, Addr,
+    Uint128, Timestamp, Addr, Empty
   };
 
   use cw721_base::MintMsg;
@@ -23,27 +23,16 @@ pub mod tests_helpers {
   const FUNDWALLET: &str = "wallet";
 
   const DENOM: &str = "ujuno";
-  const SUPPLY: u128 = 20u128;
+  const SUPPLY: u128 = 50u128;
   const COST: u128 = 4000000u128;
 
   pub fn now() -> Timestamp {
     Timestamp::from_seconds(0)
   }
 
-  pub fn get_mint_msg (
-    id: String
-  ) -> MintMsg<Extension> {
-      MintMsg {
-          token_id: id,
-          owner: ADMIN.to_string(),
-          token_uri: None,
-          extension: None,
-      }
-  }
-
   pub fn get_init_msg (
-      star_mint: u64,
-      end_mint: u64,
+    star_mint: u64,
+    end_mint: u64,
   ) -> InstantiateMsg {
       InstantiateMsg {
           name: "nft".to_string(),
@@ -68,6 +57,17 @@ pub mod tests_helpers {
       }
   }
 
+  pub fn get_mint_msg (
+    id: String
+  ) -> MintMsg<Extension> {
+      MintMsg {
+          token_id: id,
+          owner: ADMIN.to_string(),
+          token_uri: None,
+          extension: None,
+      }
+  }
+
   pub fn get_store_batch_msg (
     num: usize
   ) -> BatchStoreMsg {
@@ -80,5 +80,15 @@ pub mod tests_helpers {
       BatchStoreMsg {
           batch
       }
+  }
+
+  pub fn nft_custom_contract() -> Box<dyn Contract<Empty> + 'static> {
+    let contract = ContractWrapper::new(
+        crate::contract::execute,
+        crate::contract::instantiate,
+        crate::contract::query,
+    )
+      .with_migrate(crate::contract::migrate);
+    Box::new(contract)
   }
 }

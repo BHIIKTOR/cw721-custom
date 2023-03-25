@@ -566,11 +566,10 @@ pub fn execute_store_conf(
     // validate sender permissions
     can_store(&deps, &info)?;
 
-    let cw721_contract = CW721Contract::default();
-    let minter = cw721_contract.minter.load(deps.storage)?;
-    let conf = CONFIG.load(deps.storage)?;
-
-    let mut store_conf = conf.store_conf;
+    let contract = CW721Contract::default();
+    let minter = contract.minter.load(deps.storage)?;
+    let mut conf = CONFIG.load(deps.storage)?;
+    let mut store_conf = conf.store_conf.clone();
 
     // overwrite the original if we have data in the msg
     if msg.conf.is_some() {
@@ -582,11 +581,11 @@ pub fn execute_store_conf(
 
     let mut total = conf.token_total;
 
-    for attr_values in msg.attributes {
+    msg.attributes.into_iter().for_each(|item| {
         let name = format!("{} #{}", store_data.name, total);
 
         let mut attr : Vec<Trait> = vec![];
-        for (index, value) in attr_values.iter().enumerate() {
+        for (index, value) in item.iter().enumerate() {
             attr.push(Trait {
                 display_type: None,
                 value: value.clone(),
@@ -611,12 +610,14 @@ pub fn execute_store_conf(
             })
         };
 
-        cw721_contract.tokens.save(deps.storage, &total.to_string(), &token)?;
+        contract.tokens.save(deps.storage, &name, &token).unwrap();
 
-        total += Uint128::one()
-    }
+        total = total.checked_add(Uint128::one()).unwrap();
+    });
 
-    total = update_total(deps.storage, &total)?;
+    conf.token_total = conf.token_total.checked_add(total).unwrap();
+
+    CONFIG.save(deps.storage, &conf)?;
 
     Ok(Response::new()
         .add_attribute("action", "store_conf")

@@ -7,7 +7,7 @@ use cosmwasm_std::{
   Addr,
   Timestamp,
   Env,
-  BlockInfo, StdError
+  BlockInfo, StdError, StdResult
 };
 
 use cw721_base::{
