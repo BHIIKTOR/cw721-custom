@@ -1,11 +1,10 @@
 #[cfg(test)]
 mod general {
-    use cosmwasm_std::coin;
     use cw_multi_test::App;
-    use roboto::roboto::{Roboto, RobotoContractData};
-    use cw721_base::MintMsg;
+    use roboto::{Roboto, RobotoContractData};
+    use crate::error::ContractError;
     use crate::msg::{StoreConfMsg, StoreConf, InstantiateMsg};
-    use crate::tests::test_helpers::tests_helpers::nft_custom_contract;
+    use crate::tests::test_helpers::tests_helpers::{nft_custom_contract, get_mint_msg};
     use crate::{
         msg::ExecuteMsg,
         tests::test_helpers::tests_helpers::{
@@ -28,12 +27,7 @@ mod general {
             init_msg
         );
 
-        let store_one = ExecuteMsg::Store(MintMsg {
-            token_id: String::from("0"),
-            owner: ADMIN.to_string(),
-            token_uri: None,
-            extension: None,
-        });
+        let store_one = ExecuteMsg::Store(get_mint_msg("0".to_string()));
 
         let store_batch = ExecuteMsg::StoreBatch(get_store_batch_msg(20));
 
@@ -52,14 +46,14 @@ mod general {
 
         roboto
             .init(NFT_CUSTOM, init)
-            .exec::<ExecuteMsg>(NFT_CUSTOM, store_one, Some(|res| {
-                assert_eq!(res.events[1].attributes[1].value, "store");
+            .exec::<ExecuteMsg, ContractError>(NFT_CUSTOM, store_one, Some(|res| {
+                assert_eq!(res.unwrap().events[1].attributes[1].value, "store");
             }))
-            .exec::<ExecuteMsg>(NFT_CUSTOM, store_batch, Some(|res| {
-                assert_eq!(res.events[1].attributes[1].value, "store_batch");
+            .exec::<ExecuteMsg, ContractError>(NFT_CUSTOM, store_batch, Some(|res| {
+                assert_eq!(res.unwrap().events[1].attributes[1].value, "store_batch");
             }))
-            .exec::<ExecuteMsg>(NFT_CUSTOM, store_conf, Some(|res| {
-                assert_eq!(res.events[1].attributes[1].value, "store_conf");
+            .exec::<ExecuteMsg, ContractError>(NFT_CUSTOM, store_conf, Some(|res| {
+                assert_eq!(res.unwrap().events[1].attributes[1].value, "store_conf");
             }));
     }
 }

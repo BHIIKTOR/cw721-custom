@@ -41,3 +41,5 @@ serde           = { workspace = true }
 [dev-dependencies]
 cw-multi-test   = { workspace = true }
 roboto          = { workspace = true }
+cw20            = { workspace = true }
+cw20-base       = { workspace = true }

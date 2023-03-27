@@ -1,13 +1,7 @@
 use cosmwasm_std::{
-  DepsMut,
-  MessageInfo,
-  Coin,
-  Uint128,
-  Storage,
-  Addr,
-  Timestamp,
-  Env,
-  BlockInfo, StdError, StdResult
+  DepsMut, MessageInfo, Coin, Uint128,
+  Storage, Addr, Timestamp,
+  Env, BlockInfo, StdError
 };
 
 use cw721_base::{
@@ -53,10 +47,6 @@ pub fn can_update(
   deps: &DepsMut,
   info: &MessageInfo
 ) -> Result<(), ContractError> {
-  // let cw721_contract = CW721Contract::default();
-
-  // let minter = cw721_contract.minter.load(deps.storage)?;
-
   let creator = CONFIG.load(deps.storage)?.creator;
 
   if info.sender != creator {
@@ -196,27 +186,32 @@ pub fn can_pay(
     return Err(ContractError::TooManyDenoms {})
   }
 
-  if let Some(coin) = info.funds.first() {
-      if coin.denom != config.cost.denom {
-        Err(ContractError::WrongToken {})
-      } else {
+  match info.funds.first() {
+    Some(coin) => {
+      match coin.denom == config.cost.denom {
+        true => {
           let total = config.cost.amount * amount;
 
-          if coin.amount < total {
-              return Err(ContractError::NotEnoughFunds {})
+          match total == coin.amount {
+            true => {
+              coin_found.denom = coin.denom.clone();
+              coin_found.amount = coin.amount;
+
+              Ok(coin_found)
+            },
+            false => {
+              if coin.amount < total {
+                return Err(ContractError::NotEnoughFunds {})
+              } else {
+                return Err(ContractError::IncorrectFunds {})
+              }
+            },
           }
-
-          if coin.amount != total {
-            return Err(ContractError::IncorrectFunds {})
-          }
-
-          coin_found.denom = coin.denom.clone();
-          coin_found.amount = coin.amount;
-
-          Ok(coin_found)
+        },
+        false => Err(ContractError::WrongToken {}),
       }
-  } else {
-    Err(ContractError::NoFundsSent {})
+    },
+    None => Err(ContractError::NoFundsSent {}),
   }
 }
 

@@ -19,12 +19,10 @@ pub mod tests_helpers {
   use crate::state::Extension;
 
   const ADMIN: &str = "admin";
-
   const FUNDWALLET: &str = "wallet";
-
   const DENOM: &str = "ujuno";
-  const SUPPLY: u128 = 50u128;
   const COST: u128 = 4000000u128;
+  const SUPPLY: u128 = 50u128;
 
   pub fn now() -> Timestamp {
     Timestamp::from_seconds(0)
@@ -89,6 +87,7 @@ pub mod tests_helpers {
         crate::contract::query,
     )
       .with_migrate(crate::contract::migrate);
+
     Box::new(contract)
   }
 }
